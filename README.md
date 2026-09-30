@@ -1,5 +1,7 @@
 # Agent F
 
+<p align="center"><img src="assets/red-panda-256.png" width="180" alt="Franklin the Firefox, Agent F's mascot: a red panda in a fedora"></p>
+
 Agent F lets an AI agent work in the Firefox you're already using: your running profiles, your tabs and your signed-in sessions. It works in the background while you keep browsing, and it tells the agent whenever you or the page change something between its steps.
 
 It has three parts:

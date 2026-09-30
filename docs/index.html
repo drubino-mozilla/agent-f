@@ -1,6 +1,62 @@
 <!doctype html>
+<html lang="en">
+<head>
 <meta charset="utf-8">
-<title>Agent F</title>
-<meta http-equiv="refresh" content="0; url=https://github.com/drubino-mozilla/agent-f">
-<p>Agent F lives at <a href="https://github.com/drubino-mozilla/agent-f">github.com/drubino-mozilla/agent-f</a>.
-This site serves its add-on <a href="updates.json">update manifest</a>.</p>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Agent F: let AI agents work in your running Firefox</title>
+<meta name="description" content="Agent F lets an AI agent work in the Firefox you're already using: your tabs and signed-in sessions, in the background, while you keep browsing.">
+<meta property="og:title" content="Agent F">
+<meta property="og:description" content="Let AI agents work in your running Firefox, in the background, while you keep browsing.">
+<meta property="og:image" content="https://drubino-mozilla.github.io/agent-f/red-panda-256.png">
+<link rel="icon" href="favicon.png">
+<style>
+  :root { color-scheme: light dark; --accent: #e25920; }
+  body { font: 17px/1.55 system-ui, sans-serif; max-width: 44rem; margin: 0 auto; padding: 2.5rem 1.25rem 4rem; }
+  header { text-align: center; }
+  header img { width: 180px; height: 180px; }
+  h1 { font-size: 2.4rem; margin: .4rem 0 .2rem; }
+  .tagline { font-size: 1.2rem; opacity: .85; margin-top: 0; }
+  h2 { margin-top: 2.2rem; border-bottom: 2px solid var(--accent); padding-bottom: .2rem; }
+  a { color: var(--accent); }
+  code { font: .92em ui-monospace, monospace; background: color-mix(in srgb, currentColor 10%, transparent); padding: .1em .35em; border-radius: 4px; }
+  .buttons { display: flex; gap: .75rem; justify-content: center; flex-wrap: wrap; margin: 1.5rem 0 .5rem; }
+  .buttons a { text-decoration: none; padding: .6rem 1.1rem; border-radius: 8px; border: 2px solid var(--accent); font-weight: 600; }
+  .buttons a.primary { background: var(--accent); color: white; }
+  footer { margin-top: 3rem; font-size: .9rem; opacity: .75; text-align: center; }
+</style>
+</head>
+<body>
+<header>
+  <img src="red-panda-256.png" alt="Franklin the Firefox, a red panda in a fedora">
+  <h1>Agent F</h1>
+  <p class="tagline">Let AI agents work in the Firefox you're already using.</p>
+  <div class="buttons">
+    <a class="primary" href="https://github.com/drubino-mozilla/agent-f#install">Install</a>
+    <a href="https://github.com/drubino-mozilla/agent-f">Source on GitHub</a>
+    <a href="https://github.com/drubino-mozilla/agent-f/releases/latest">Latest release</a>
+  </div>
+</header>
+
+<p>Agent F connects any MCP client, such as Cursor or Claude, to your running Firefox: your profiles, your tabs and your signed-in sessions. The agent works in background tabs while you keep browsing, and never takes focus. Every result tells it what changed since its last step, so it keeps up when you close a tab or a page navigates on its own.</p>
+
+<h2>What an agent can do</h2>
+<ul>
+  <li>Open, read and close tabs, keeping its own in an "Agent F" tab group, across several Firefox profiles at once.</li>
+  <li>Read pages as accessibility-style snapshots, Markdown or screenshots.</li>
+  <li>Click, type, scroll, choose options, drag, upload files and run scripts, even in minimized windows.</li>
+  <li>Answer alerts, and capture network requests and console messages.</li>
+  <li>Search history and bookmarks, and reopen recently closed tabs.</li>
+</ul>
+
+<h2>Install</h2>
+<p>You need Firefox 140 or later, Python 3.11 or later, and git. The easiest way is to ask your agent: <em>"Clone github.com/drubino-mozilla/agent-f and run its installer with --addon."</em> The <a href="https://github.com/drubino-mozilla/agent-f#install">README</a> has the manual steps for Windows, macOS and Linux. The add-on updates itself.</p>
+
+<h2>You stay in control</h2>
+<p>Everything stays on your computer. The broker listens only on <code>127.0.0.1</code> and needs a secret token, and web pages can't reach it. The red panda toolbar button shows what agents are doing and has a Pause switch, and every call goes into a local audit log. Firefox needs no special flags, and sites see an ordinary browser.</p>
+
+<footer>
+  <p>Franklin the Firefox is a nod to Perry the Platypus, whose secret identity is Agent P. The red panda is the animal Firefox is named after.</p>
+  <p>MPL-2.0 &middot; <a href="https://github.com/drubino-mozilla/agent-f">github.com/drubino-mozilla/agent-f</a> &middot; <a href="updates.json">update manifest</a></p>
+</footer>
+</body>
+</html>
