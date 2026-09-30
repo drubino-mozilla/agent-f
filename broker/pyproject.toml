@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "agent-f"
-version = "0.1.0"
+version = "0.4.0"
 description = "Agent F broker: lets MCP clients work in the user's running Firefox"
 license = "MPL-2.0"
 requires-python = ">=3.11"

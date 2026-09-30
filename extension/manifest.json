@@ -1,12 +1,13 @@
 {
   "manifest_version": 2,
   "name": "Agent F",
-  "version": "0.3.1",
+  "version": "0.4.0",
   "description": "Lets your AI agent work in this Firefox, in the background, while you keep browsing.",
   "browser_specific_settings": {
     "gecko": {
       "id": "agent-f@drubino-mozilla.github.io",
       "strict_min_version": "140.0",
+      "update_url": "https://drubino-mozilla.github.io/agent-f/updates.json",
       "data_collection_permissions": {
         "required": ["none"]
       }
