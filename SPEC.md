@@ -385,7 +385,8 @@ If Firefox doesn't fill the form, for example because there are several saved lo
 ## 11. Where the extension can't reach
 
 - Privileged `about:` pages such as `about:preferences`, `about:addons` and `about:config`: the extension can see their tabs and close them, but can't open them, read them or act in them.
-- Mozilla's restricted domains. By default Firefox blocks all extensions on a list of Mozilla sites (`extensions.webextensions.restrictedDomains`): addons.mozilla.org, the Mozilla accounts sites, and support.mozilla.org among others. Your Nightly profile already clears this list, which is why SUMO works for you today. The installer offers to clear it, but only with Firefox closed, because it goes into `user.js`. The explanation it shows makes clear that the change applies to every extension in that profile.
+- Mozilla's restricted domains. By default Firefox blocks all extensions on a list of Mozilla sites (`extensions.webextensions.restrictedDomains`): addons.mozilla.org, the Mozilla accounts sites, and support.mozilla.org among others. Clearing that pref in `about:config` opens them up, for every extension in that profile. The installer leaves it alone. The author's Nightly clears it, which is why SUMO works there.
+- addons.mozilla.org, always. Clearing the pref doesn't help there. `WebExtensionPolicy::IsRestrictedURI` also blocks every site that may use the add-on install API (`AddonManagerWebAPI::IsValidSite`), a hard-coded list with no pref. So creating the addons.mozilla.org API key for signing is a step for the user.
 - Quarantined domains. Mozilla can remotely mark sites where extensions are blocked unless you allow a given add-on on them. That setting is "Run on sites with restrictions" on the add-on's page in `about:addons`.
 - Private windows, unless you allow the add-on to run in them (`about:addons`, off by default).
 
@@ -407,18 +408,20 @@ Agent F gives an agent full control of your web sessions. The threats and mitiga
 
 ## 13. Installation
 
-The goal is no terminal for the user. An agent runs the installer, or the user double-clicks `install\Install Agent F.cmd`.
+The goal is no terminal for the user. An agent runs the installer, or the user double-clicks `install\Install Agent F.cmd` on Windows or `install/Install Agent F.command` on macOS. What differs between operating systems lives in `install/platforms.py`.
 
-`install/install.py` runs these steps, and each one is safe to repeat:
+`install/install.py` runs these steps, and each one is safe to repeat. The data folder is `%LOCALAPPDATA%\agent-f` on Windows, `~/Library/Application Support/agent-f` on macOS, and `~/.local/share/agent-f` (or under `XDG_DATA_HOME`) on Linux.
 
-1. Checks for Python 3.11 or later, and creates a venv in `%LOCALAPPDATA%\agent-f\venv`, using `uv` if present or `py -3 -m venv` otherwise. Installs the broker into it.
-2. Generates the token if it's missing, and picks the two ports. It keeps the defaults (47470 and 47471) if they are free and outside the ranges Windows reserves (`netsh interface ipv4 show excludedportrange`) and hands out on its own (the dynamic range, 49152 and up by default). Otherwise it picks the next free pair below that range. The chosen ports go in `%LOCALAPPDATA%\agent-f\config.json`, which the broker, the helper and the Cursor entry all read.
-3. Writes the native-messaging manifest to `%LOCALAPPDATA%\agent-f\native\agent_f.json`, allowing only the add-on ID `agent-f@drubino-mozilla.github.io`, and registers it under `HKCU\Software\Mozilla\NativeMessagingHosts\agent_f`.
-4. Registers the broker to start at logon (the `Agent F broker` value under `HKCU\Software\Microsoft\Windows\CurrentVersion\Run`, running `pythonw -m agent_f.broker`) and restarts it now, so a re-run picks up new code.
-5. Finds Firefox profiles in `profiles.ini` and asks which ones get Agent F. For each running profile it opens the signed XPI in that browser, which shows Firefox's install prompt: one click, no restart. For each profile that isn't running, it copies the XPI into the profile's `extensions` folder, and Firefox asks once at next start.
-6. Offers to clear the restricted-domains list (section 11) in profiles that aren't running.
-7. Adds or updates the `agent-f` entry in `~/.cursor/mcp.json`, with the URL and the `Authorization` header.
-8. Runs a self-test: the broker is up, each chosen browser has connected, and `list_tabs` works.
+1. Creates a venv in the data folder, using `uv` if present or the `venv` module otherwise, and installs the broker into it.
+2. Generates the token if it's missing, and picks the two ports. It keeps the defaults (47470 and 47471) if they are free and outside any reserved range. On Windows those are the ranges Windows reserves (`netsh interface ipv4 show excludedportrange`) and its dynamic range (49152 and up by default), and on macOS the ephemeral range, also from 49152. Linux reserves nothing up front, so a free port is enough there. Otherwise it picks the next free pair below. The chosen ports go in `config.json` in the data folder, which the broker, the helper and the Cursor entry all read.
+3. Writes the native-messaging manifest to `native/agent_f.json` in the data folder, allowing only the add-on ID `agent-f@drubino-mozilla.github.io`, and a launcher for the helper (`agent_f_host.bat`, or `agent_f_host.sh` elsewhere). It registers the manifest under `HKCU\Software\Mozilla\NativeMessagingHosts\agent_f` on Windows, and copies it into `~/Library/Application Support/Mozilla/NativeMessagingHosts/` on macOS or `~/.mozilla/native-messaging-hosts/` on Linux.
+4. Registers the broker to start at login and restarts it now, so a re-run picks up new code:
+   - Windows: the `Agent F broker` value under `HKCU\Software\Microsoft\Windows\CurrentVersion\Run`, running `pythonw -m agent_f.broker`;
+   - macOS: a LaunchAgent, `~/Library/LaunchAgents/io.github.drubino-mozilla.agent-f.plist`;
+   - Linux: a systemd user unit, `agent-f-broker.service`, or an XDG autostart entry where systemd isn't running.
+5. With `--addon`, downloads the newest signed XPI named in the update manifest, checks its SHA-256, and copies it into the `extensions` folder of each chosen profile. By default those are the profiles each Firefox installation starts with, from `profiles.ini` and `installs.ini`. `--profile NAME` picks others, and `--list-profiles` lists them. Firefox asks once, at its next start, whether to enable it. A profile that runs Agent F from a source folder is left alone.
+6. Adds or updates the `agent-f` entry in `~/.cursor/mcp.json`, with the URL and the `Authorization` header.
+7. Runs a self-test: calls `list_browsers` through the running broker.
 
 The Cursor configuration entry it writes:
 
@@ -426,17 +429,22 @@ The Cursor configuration entry it writes:
 {"agent-f": {"url": "http://127.0.0.1:47470/mcp", "headers": {"Authorization": "Bearer <token>"}}}
 ```
 
-`install.py --uninstall` reverses every step. The signed add-on updates itself from an `update_url` pointing at the project's releases, and re-running the installer updates the broker.
+`install.py --uninstall` reverses every step except the add-on, which is removed in `about:addons`. The signed add-on updates itself: its `update_url` is `https://drubino-mozilla.github.io/agent-f/updates.json`, which GitHub Pages serves from `docs/updates.json`, and each entry points at a GitHub release asset with its SHA-256. Re-running the installer (after `git pull`) updates the broker.
+
+A release is one command, `tools/release.py`, run from a clean tree after bumping the version in `extension/manifest.json`:
+1. `tools/build_xpi.py` zips `extension/` into `dist/`, with fixed timestamps.
+2. `tools/sign_xpi.py` uploads it to addons.mozilla.org's v5 API on the unlisted channel, waits for validation and signing, and downloads the signed file. It authenticates with a JWT made from the author's API key, read from `.local/amo-credentials.json` (git-ignored) or the `AMO_JWT_ISSUER` and `AMO_JWT_SECRET` variables.
+3. It creates a GitHub release, `v<version>`, with the signed XPI, adds the version to `docs/updates.json`, and commits and pushes it.
 
 Firefox keeps a page's content scripts alive across an add-on update or reload. So the background page fingerprints the content files at startup and sends the fingerprint with every message. A page with an older copy answers `stale_content` and gets the files injected again. The files redefine their functions each time they run, keep the page's refs, and register their listeners only once. The `reload_extension` tool reloads the add-on from disk in one browser, which picks up extension changes without restarting Firefox. It doesn't update what `about:addons` shows (name, icons), which Firefox keeps in its add-on database. For a linked install, even a restart with a new version didn't refresh that. Removing the add-on and installing it again did.
 
 For development, `tools/dev_profile.py` creates throwaway Nightly profiles (`dev1`, `dev2`, and so on) in `%LOCALAPPDATA%\agent-f\dev-profiles\`, launched with `-profile`, so they never appear in Firefox's profile manager. Each has a `user.js` that allows unsigned add-ons and skips first-run pages. It also has a link file in its `extensions` folder, named after the add-on ID and containing the path to this clone's `extension` folder, so the profile runs the extension straight from source. Everyday profiles are never used for development. `install.py --restart` restarts the broker after a code change. The broker is installed in editable mode, so it runs from the clone.
 
-Until the signed build exists (M4), step 5 is skipped and only dev profiles get the extension.
+The author's Nightly runs the extension the same way, from a link file, so it isn't given the signed build.
 
 ## 14. Platforms, signing and licence
 
-- Windows 11 is supported from M0. macOS and Linux are designed in from the start and delivered in M4. Platform-specific pieces live behind one module, `agent_f/platform/`: native-host registration (the `NativeMessagingHosts` folders), autostart (launchd, systemd user units) and the token file location.
+- Windows 11 is supported from M0 and is where Agent F is tested. macOS and Linux support arrived in M4, in `install/platforms.py`: native-host registration, autostart, process control, reserved ports and where Firefox keeps its profiles. It is covered by unit tests but hasn't yet run on a Mac or a Linux machine. Snap and Flatpak builds of Firefox on Linux restrict native messaging and may not reach the helper.
 - Firefox 140 or later on any channel. The extension uses only standard APIs, so addons.mozilla.org can sign it as an unlisted, self-distributed add-on. It then installs anywhere with no pref changes. `tools/sign_xpi.py` calls the addons.mozilla.org signing API with the author's API credentials (see Q6).
 - The add-on's display name avoids "Firefox", which addons.mozilla.org doesn't allow in add-on names.
 - Licence: MPL-2.0, Mozilla's default.
@@ -458,7 +466,6 @@ agent-f/
       server.py        tool definitions and the HTTP guard (split into tools/ as it grows)
       bridge.py        helper connections, request routing, the hub
       selftest.py      calls a tool through the running broker
-      platform/        windows.py, macos.py, linux.py (M4)
     tests/
   host/
     agent_f_host.py    stdlib-only native-messaging relay; the installer writes its .bat launcher
@@ -470,12 +477,16 @@ agent-f/
     vendor/readability/
   install/
     install.py
-    Install Agent F.cmd
+    platforms.py       what differs on Windows, macOS and Linux
+    Install Agent F.cmd       double-click launcher, Windows
+    Install Agent F.command   double-click launcher, macOS (also runs on Linux)
   tools/
     dev_profile.py     throwaway profiles that run the extension from this clone; restart reloads it
     mcp_call.py        runs a sequence of tool calls through the broker, for testing
-    build_xpi.py       (M4)
-    sign_xpi.py        (M4)
+    build_xpi.py       packages extension/ into dist/
+    sign_xpi.py        signs a package as an unlisted add-on on addons.mozilla.org
+    release.py         build, sign, GitHub release, update manifest
+  docs/                GitHub Pages: updates.json, the add-on's update manifest
   testpages/           local fixtures served by the test harness
 ```
 
@@ -558,9 +569,10 @@ Each milestone ends with its acceptance tests passing on Windows.
   - recovery from discarded tabs;
   - adding Agent F to the author's `~/.cursor/mcp.json`;
   - updating the author's own agent instructions to use Agent F.
-- M4, shareable:
-  - addons.mozilla.org signing and self-hosted updates;
-  - macOS and Linux installers;
+- M4, shareable (in progress 2026-09-29):
+  - a public repo, `drubino-mozilla/agent-f`, published with a fresh history;
+  - addons.mozilla.org signing and self-hosted updates (tools built; the first signed release, 0.4.0, waits on the API key);
+  - macOS and Linux installers (built and unit-tested, not yet run on either);
   - a README for colleagues.
 
 ## 19. Open questions
