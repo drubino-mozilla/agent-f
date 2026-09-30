@@ -1,0 +1,108 @@
+/* This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this
+ * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
+
+:root {
+  color-scheme: light dark;
+  --accent: #ff7139;
+  --muted: GrayText;
+  --ok: #2ac3a2;
+  --bad: #e22850;
+  font: menu;
+  font-size: 13px;
+}
+
+body.panel {
+  width: 340px;
+  margin: 12px;
+}
+
+body.options {
+  max-width: 520px;
+  margin: 16px;
+}
+
+header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+h1 {
+  font-size: 15px;
+  margin: 0;
+}
+
+h2 {
+  font-size: 13px;
+  margin: 16px 0 6px;
+}
+
+.status {
+  margin: 10px 0;
+  padding-inline-start: 8px;
+  border-inline-start: 3px solid var(--muted);
+}
+
+.status.ok {
+  border-color: var(--ok);
+}
+
+.status.bad,
+.status.paused {
+  border-color: var(--bad);
+}
+
+button {
+  padding: 4px 12px;
+}
+
+.muted {
+  color: var(--muted);
+}
+
+.recent {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  max-height: 260px;
+  overflow-y: auto;
+}
+
+.recent li {
+  display: grid;
+  grid-template-columns: auto auto 1fr;
+  gap: 8px;
+  padding: 3px 0;
+  border-bottom: 1px solid color-mix(in srgb, currentColor 12%, transparent);
+}
+
+.recent .time {
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.recent .where {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--muted);
+}
+
+.recent li.failed .what::after {
+  content: " (failed)";
+  color: var(--bad);
+}
+
+footer {
+  margin-top: 12px;
+}
+
+label {
+  display: block;
+  margin: 10px 0 4px;
+}
+
+form {
+  margin-bottom: 20px;
+}

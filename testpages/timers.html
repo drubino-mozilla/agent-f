@@ -1,0 +1,19 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Agent F fixture: timers and visibility</title>
+</head>
+<body>
+<h1>Background behaviour</h1>
+<button id="later" onclick="setTimeout(() => { document.getElementById('msg').textContent = 'Delayed message arrived'; }, 1500)">Show a message in 1.5 s</button>
+<label>Name <input id="name"></label>
+<p id="msg" role="status">Waiting.</p>
+<script>
+  window.stats = { interval: 0, raf: 0, visibility: [], started: Date.now() };
+  setInterval(() => window.stats.interval++, 100);
+  (function frame() { window.stats.raf++; requestAnimationFrame(frame); })();
+  document.addEventListener("visibilitychange", () => window.stats.visibility.push(document.visibilityState));
+</script>
+</body>
+</html>

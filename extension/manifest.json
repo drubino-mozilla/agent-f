@@ -1,0 +1,77 @@
+{
+  "manifest_version": 2,
+  "name": "Agent F",
+  "version": "0.3.1",
+  "description": "Lets your AI agent work in this Firefox, in the background, while you keep browsing.",
+  "browser_specific_settings": {
+    "gecko": {
+      "id": "agent-f@drubino-mozilla.github.io",
+      "strict_min_version": "140.0",
+      "data_collection_permissions": {
+        "required": ["none"]
+      }
+    }
+  },
+  "icons": {
+    "16": "icons/red-panda-16.png",
+    "32": "icons/red-panda-32.png",
+    "48": "icons/red-panda-48.png",
+    "96": "icons/red-panda-96.png",
+    "128": "icons/red-panda-128.png"
+  },
+  "permissions": [
+    "tabs",
+    "tabGroups",
+    "contextualIdentities",
+    "nativeMessaging",
+    "storage",
+    "webNavigation",
+    "webRequest",
+    "webRequestBlocking",
+    "find",
+    "history",
+    "bookmarks",
+    "downloads",
+    "sessions",
+    "<all_urls>"
+  ],
+  "background": {
+    "scripts": [
+      "background/common.js",
+      "background/tabs.js",
+      "background/page.js",
+      "background/capture.js",
+      "background/data.js",
+      "background/background.js"
+    ],
+    "persistent": true
+  },
+  "browser_action": {
+    "default_icon": {
+      "16": "icons/red-panda-16.png",
+      "32": "icons/red-panda-32.png"
+    },
+    "default_title": "Agent F",
+    "default_popup": "ui/panel.html"
+  },
+  "options_ui": {
+    "page": "ui/options.html"
+  },
+  "content_scripts": [
+    {
+      "matches": ["<all_urls>"],
+      "all_frames": true,
+      "match_about_blank": true,
+      "run_at": "document_start",
+      "js": [
+        "vendor/readability/Readability.js",
+        "content/core.js",
+        "content/hooks.js",
+        "content/snapshot.js",
+        "content/input.js",
+        "content/read.js",
+        "content/main.js"
+      ]
+    }
+  ]
+}

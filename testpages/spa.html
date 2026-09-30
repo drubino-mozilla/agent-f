@@ -1,0 +1,27 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Agent F fixture: single-page app</title>
+</head>
+<body>
+<nav>
+  <button data-view="inbox">Inbox</button>
+  <button data-view="archive">Archive</button>
+</nav>
+<main id="view"><h1>Inbox</h1><p>3 messages</p></main>
+<script>
+  for (const b of document.querySelectorAll("nav button")) {
+    b.addEventListener("click", () => {
+      const view = b.dataset.view;
+      history.pushState({}, "", "#" + view);
+      setTimeout(() => {
+        document.getElementById("view").innerHTML =
+          view === "archive" ? "<h1>Archive</h1><p>12 old messages</p><button>Restore all</button>" : "<h1>Inbox</h1><p>3 messages</p>";
+        document.title = "Agent F fixture: " + view;
+      }, 400);
+    });
+  }
+</script>
+</body>
+</html>
