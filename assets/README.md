@@ -3,9 +3,9 @@
 Franklin the Firefox: a red panda in a fedora.
 
 - `red-panda.ico`: Windows icon with 16, 24, 32, 48, 64, 96, 128 and 256 pixel versions, for a future installer or shortcut.
-- `red-panda-256.png`, `red-panda-512.png`: larger exports.
+- `red-panda-256.png`, `red-panda-512.png`: larger exports. The 256 version is the README image and the addons.mozilla.org icon.
 - `red-panda-master.png`: the original 1254 × 1254 artwork, with a transparent background.
+- `social-preview.png`: 1280 × 640 image for link previews, set as the GitHub repo's social preview and used by the landing page.
+- `amo-description.md`: the add-on's description on addons.mozilla.org.
 
-The extension's own copies, at 16 to 128 pixels, are in `extension/icons/`.
-
-The artwork was generated with an AI image-generation tool from this brief: a cartoon red panda wearing a brown fedora, inspired by Perry the Platypus's deadpan undercover-agent attitude, as a flat-colour mascot that stays readable at 16 and 32 pixels.
+The add-on's own icons are in `extension/icons/`, and `docs/` has copies of the images the landing page uses.
