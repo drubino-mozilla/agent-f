@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Agent F fixture: dialogs, capture, files, drag</title>
+<style>
+  #zone, #bin { border: 2px dashed #888; padding: 16px; margin: 8px 0; min-height: 30px; }
+  #track { position: relative; width: 300px; height: 20px; background: #ddd; margin: 8px 0; }
+  #thumb { position: absolute; left: 0; top: 0; width: 20px; height: 20px; background: #f60; cursor: grab; }
+  li[draggable] { cursor: move; }
+</style>
+</head>
+<body>
+<h1>M2 fixture</h1>
+<section aria-label="Dialogs">
+  <button id="alert" onclick="window.alert('Saved!'); log('alert done')">Alert</button>
+  <button id="confirm" onclick="log('confirm returned ' + window.confirm('Delete 3 items?'))">Confirm</button>
+  <button id="prompt" onclick="log('prompt returned ' + JSON.stringify(window.prompt('Your name?', 'x')))">Prompt</button>
+  <button id="popup" onclick="const w = window.open('https://example.com/popup'); log('open returned ' + (w ? 'a window' : 'null'))">Open popup</button>
+</section>
+<section aria-label="Capture">
+  <button id="fetch" onclick="fetch('data.json').then(r => r.json()).then(d => { console.log('fetched', d); log('fetched ' + d.items.length) })">Fetch data</button>
+  <button id="login" onclick="fetch('data.json?x=1', { method: 'POST', body: JSON.stringify({ user: 'franklin', password: 'hunter2' }) }).catch(() => {}); log('posted')">Post login</button>
+  <button id="warn" onclick="console.warn('careful', { level: 2 }); console.error(new Error('boom'))">Warn and error</button>
+  <button id="throw" onclick="setTimeout(() => { throw new TypeError('uncaught on purpose') })">Throw</button>
+</section>
+<section aria-label="Files">
+  <label>Attachment <input type="file" id="file" multiple onchange="log('input got ' + [...this.files].map(f => f.name + ':' + f.size).join(', '))"></label>
+  <div id="zone" aria-label="Drop zone">Drop files here</div>
+</section>
+<section aria-label="Drag">
+  <ul aria-label="Cards">
+    <li draggable="true" id="card1">Card one</li>
+    <li draggable="true" id="card2">Card two</li>
+  </ul>
+  <div id="bin" aria-label="Done column">Done column</div>
+  <div id="track" aria-label="Volume"><div id="thumb" role="slider" aria-label="Volume thumb" aria-valuenow="0"></div></div>
+</section>
+<p id="log" role="status">Ready.</p>
+<script>
+  function log(text) { document.getElementById("log").textContent = text; }
+  const zone = document.getElementById("zone");
+  zone.addEventListener("dragover", e => e.preventDefault());
+  zone.addEventListener("drop", e => { e.preventDefault(); log("dropped " + [...e.dataTransfer.files].map(f => f.name + ':' + f.size).join(", ")); });
+  for (const li of document.querySelectorAll("li[draggable]")) {
+    li.addEventListener("dragstart", e => e.dataTransfer.setData("text/plain", li.id));
+  }
+  const bin = document.getElementById("bin");
+  bin.addEventListener("dragover", e => e.preventDefault());
+  bin.addEventListener("drop", e => { e.preventDefault(); const id = e.dataTransfer.getData("text/plain"); bin.append(document.getElementById(id)); log("moved " + id); });
+  const thumb = document.getElementById("thumb");
+  let dragging = false;
+  thumb.addEventListener("pointerdown", () => { dragging = true; });
+  document.addEventListener("pointermove", e => {
+    if (!dragging) return;
+    const r = document.getElementById("track").getBoundingClientRect();
+    const x = Math.max(0, Math.min(280, e.clientX - r.left - 10));
+    thumb.style.left = x + "px";
+    thumb.setAttribute("aria-valuenow", Math.round(x / 2.8));
+  });
+  document.addEventListener("pointerup", () => { if (dragging) log("volume " + thumb.getAttribute("aria-valuenow")); dragging = false; });
+</script>
+</body>
+</html>

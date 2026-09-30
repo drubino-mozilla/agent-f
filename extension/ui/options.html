@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<!-- This Source Code Form is subject to the terms of the Mozilla Public
+   - License, v. 2.0. If a copy of the MPL was not distributed with this
+   - file, You can obtain one at http://mozilla.org/MPL/2.0/. -->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<link rel="stylesheet" href="ui.css">
+</head>
+<body class="options">
+  <form id="label-form">
+    <h2>This browser</h2>
+    <label for="label">Name shown to agents</label>
+    <input id="label" pattern="[A-Za-z0-9][A-Za-z0-9._\-]{0,39}" required>
+    <p class="muted">Letters, digits, dot, dash or underscore. Useful when several Firefox profiles run at once.</p>
+    <button type="submit">Save name</button>
+    <span id="label-saved" class="muted" hidden>Saved.</span>
+  </form>
+
+  <form id="dialog-form">
+    <h2>Page dialogs during agent actions</h2>
+    <p class="muted">When a page asks a question while an agent is acting, Agent F answers it and tells the agent. Dialogs while you browse are never touched.</p>
+    <label for="confirm">Confirm dialogs ("Are you sure?")</label>
+    <select id="confirm">
+      <option value="accept">Answer OK</option>
+      <option value="dismiss">Answer Cancel</option>
+    </select>
+    <label for="prompt">Prompt dialogs (asking for text)</label>
+    <select id="prompt">
+      <option value="dismiss">Answer Cancel</option>
+    </select>
+    <button type="submit">Save</button>
+    <span id="dialog-saved" class="muted" hidden>Saved.</span>
+  </form>
+  <script src="options.js"></script>
+</body>
+</html>

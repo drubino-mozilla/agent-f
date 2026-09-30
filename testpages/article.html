@@ -1,0 +1,31 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Agent F fixture: a long article</title>
+</head>
+<body>
+<nav><a href="#">Home</a> <a href="#">News</a> <a href="#">About</a></nav>
+<article>
+  <h1>Why browsers throttle background tabs</h1>
+  <p class="byline">By Franklin the Firefox</p>
+  <p>Browsers slow down timers in tabs you aren't looking at. It saves battery and keeps the tab you are using fast. Most pages never notice.</p>
+  <h2>What changes in the background</h2>
+  <ul>
+    <li>Timers run at most once a second.</li>
+    <li>Animation frames stop.</li>
+    <li>Nothing is painted.</li>
+  </ul>
+  <p>Pages that pause when hidden, such as some video players, will pause. A <a href="https://developer.mozilla.org/docs/Web/API/Page_Visibility_API">Page Visibility API</a> listener is how they find out.</p>
+  <h2>Why it matters for agents</h2>
+  <p>An agent working in a background tab sees the same throttling. It has to wait for the page to settle rather than assume a fixed delay.</p>
+  <table>
+    <tr><th>State</th><th>Timers</th><th>Painting</th></tr>
+    <tr><td>Foreground</td><td>Normal</td><td>Yes</td></tr>
+    <tr><td>Background</td><td>Throttled</td><td>No</td></tr>
+  </table>
+  <p style="margin-top:2000px">The end, far down the page.</p>
+</article>
+<footer><p>Footer links and small print.</p></footer>
+</body>
+</html>

@@ -1,0 +1,25 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Agent F fixture: frames and shadow DOM</title>
+</head>
+<body>
+<h1>Frames and shadow DOM</h1>
+<iframe title="Same-origin frame" src="frame-child.html" width="400" height="120"></iframe>
+<iframe id="cross" title="Cross-origin frame" width="400" height="120"></iframe>
+<h2>Shadow</h2>
+<closed-widget></closed-widget>
+<script>
+  // The fixture server also listens on the next port, which is a different origin.
+  document.getElementById("cross").src = `${location.protocol}//${location.hostname}:${Number(location.port) + 1}/frame-child.html`;
+  customElements.define("closed-widget", class extends HTMLElement {
+    constructor() {
+      super();
+      const root = this.attachShadow({ mode: "closed" });
+      root.innerHTML = '<button onclick="this.textContent = \'Shadow clicked\'">Shadow button</button>';
+    }
+  });
+</script>
+</body>
+</html>

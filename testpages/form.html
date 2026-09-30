@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Agent F fixture: form</title>
+<style>
+  #banner { position: fixed; inset: 0; background: rgba(0, 0, 0, 0.6); color: #fff; padding: 20px; display: none; }
+  #banner.shown { display: block; }
+  .fake-button { cursor: pointer; display: inline-block; padding: 4px 8px; border: 1px solid #888; }
+</style>
+</head>
+<body>
+<header><h1>Sign in</h1></header>
+<main>
+  <form id="login" action="form.html" method="get">
+    <label>Username <input name="user" autocomplete="username"></label>
+    <label>Password <input name="pass" type="password" autocomplete="current-password"></label>
+    <label><input type="checkbox" name="remember"> Remember me</label>
+    <label>Team
+      <select name="team">
+        <option value="">Choose</option>
+        <option value="growth">Growth</option>
+        <option value="search">Search</option>
+      </select>
+    </label>
+    <button type="submit">Sign in</button>
+  </form>
+
+  <section aria-label="Extras">
+    <h2>Extras</h2>
+    <a href="https://example.com/" target="_blank">Example in a new tab</a>
+    <button id="open-modal" type="button">Open settings</button>
+    <span class="fake-button" id="fake" onclick="this.textContent = 'Clicked ' + (++window.fakeClicks)">Fake button</span>
+    <button id="show-banner" type="button" onclick="document.getElementById('banner').classList.add('shown')">Show cookie banner</button>
+    <textarea aria-label="Notes"></textarea>
+    <div contenteditable="true" aria-label="Rich editor" style="border:1px solid #ccc;min-height:2em"></div>
+    <p id="log">Nothing typed yet.</p>
+  </section>
+</main>
+<div id="banner"><p>We use cookies.</p><button onclick="this.parentNode.classList.remove('shown')">Accept</button></div>
+<script>
+  window.fakeClicks = 0;
+  document.querySelector("textarea").addEventListener("input", e => {
+    document.getElementById("log").textContent = "Notes: " + e.target.value;
+  });
+  document.getElementById("open-modal").addEventListener("click", () => {
+    const d = document.createElement("div");
+    d.setAttribute("role", "dialog");
+    d.setAttribute("aria-label", "Settings");
+    d.innerHTML = '<p>Settings</p><button onclick="this.parentNode.remove()">Close settings</button>';
+    document.body.append(d);
+  });
+</script>
+</body>
+</html>
