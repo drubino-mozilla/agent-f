@@ -74,12 +74,13 @@ def send_frame(sock: socket.socket, data: bytes) -> None:
 def start_broker(command: list[str]) -> None:
     if not command:
         return
-    flags = 0
+    detach = {"start_new_session": True}
     if sys.platform == "win32":
-        flags = subprocess.DETACHED_PROCESS | subprocess.CREATE_NEW_PROCESS_GROUP | subprocess.CREATE_NO_WINDOW
+        detach = {"creationflags": subprocess.DETACHED_PROCESS | subprocess.CREATE_NEW_PROCESS_GROUP
+                  | subprocess.CREATE_NO_WINDOW}
     try:
         subprocess.Popen(command, stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL,
-                         stderr=subprocess.DEVNULL, close_fds=True, creationflags=flags)
+                         stderr=subprocess.DEVNULL, close_fds=True, **detach)
         log("started broker")
     except OSError as err:
         log(f"could not start broker: {err}")
