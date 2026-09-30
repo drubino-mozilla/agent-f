@@ -245,7 +245,7 @@ def install_addon(names: list[str]) -> None:
             continue
         shutil.copyfile(xpi, folder / f"{ADDON_ID}.xpi")
         step(f"added the add-on to profile {profile['name']!r}")
-    print("  Restart Firefox, then accept the \"Agent F added\" prompt in the menu. After that it updates itself.")
+    print("  Restart Firefox, then enable Agent F from the notice on Firefox's menu button. After that it updates itself.")
 
 
 def self_test(venv: Path) -> None:
