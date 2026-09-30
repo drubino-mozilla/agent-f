@@ -577,9 +577,9 @@ Each milestone ends with its acceptance tests passing on Windows.
   - replacing `firefox-browser-mcp` in `~/.cursor/mcp.json`;
   - updating the author's own agent instructions to use Agent F;
   - talking to the `firefox-devtools-mcp` team about the use cases.
-- M4, shareable (in progress 2026-09-29):
+- M4, shareable (done 2026-09-29, apart from trying the installer on a Mac and on Linux):
   - a public repo, `drubino-mozilla/agent-f`, published with a fresh history;
-  - addons.mozilla.org signing and self-hosted updates (tools built; the first signed release, 0.4.0, waits on the API key);
+  - addons.mozilla.org signing and self-hosted updates (0.4.0 signed and released; the update manifest lists it);
   - macOS and Linux installers (built and unit-tested, not yet run on either);
   - a README for colleagues.
 
@@ -601,7 +601,7 @@ Each milestone ends with its acceptance tests passing on Windows.
   - The same held for a background tab inside the minimized window.
 - Q4. `execCommand("insertText")` from a content script. Does it work in background tabs, and do sites accept the input events it produces? The fallback is setting `value` through the element's native setter and dispatching `input` and `change`, which frameworks like React accept. Resolved 2026-09-29: yes. Typing into a textarea and, key by key, into a `contenteditable` in a background tab (`document.visibilityState` hidden) went through Firefox's editor with no fallback, and the page's `input` listeners fired. `type` says when it had to use the fallback.
 - Q5. Manifest V2 lifetime. Mozilla has said MV2 stays supported in Firefox. If that changes, MV3 loses `tabs.executeScript` with `code` strings. The replacement would be the `userScripts` API's `execute`. Check that it covers `eval_page` before it's needed.
-- Q6. Signing. Does the addons.mozilla.org automated review accept an unlisted add-on that runs `code` strings, uses `nativeMessaging` and wraps page functions? Try it early in M4 with a stub build. The fallback is an unsigned build for Nightly and Developer Edition only.
+- Q6. Signing. Does the addons.mozilla.org automated review accept an unlisted add-on that runs `code` strings, uses `nativeMessaging` and wraps page functions? Try it early in M4 with a stub build. The fallback is an unsigned build for Nightly and Developer Edition only. Resolved 2026-09-29: yes. The full 0.4.0 build passed validation with 3 warnings and no errors, and was signed automatically within about five minutes of upload.
 - Q7. `beforeunload`. Does `tabs.remove` skip `beforeunload` prompts? What happens when `navigate` hits one?
 - Q8. Full-page screenshots. Does `captureTab` with a `rect` larger than the viewport capture the whole document, and up to what size? Resolved 2026-09-29: yes. The `rect` is in document coordinates, so full-page and single-element captures work even when the page is scrolled, and from background tabs too. The broker caps full pages at 12000 px tall.
 - Q9. Popups. When a page's `window.open` is blocked because there was no user activation, can the content script report the intended URL? That would let the agent open it with `open_tab`. Partly answered 2026-09-29, for links that open in a new tab (`target=_blank`, or a modifier or middle click). `click` lets the page's own handlers run, cancels the default action unless the page already did, and opens the link in a background tab in the Agent F group. Resolved in M2 for script-initiated `window.open`: the page's `window.open` is wrapped. When Firefox blocks it during an agent action, the action's Effects report the address and suggest `open_tab`. It isn't opened automatically, because flows that rely on the popup's link back to its opener (sign-in popups, for example) wouldn't work in a separate tab anyway.
