@@ -42,6 +42,9 @@ const COMMAND_NAMES = {
   restore_closed: "Restored a closed tab",
 };
 
+// The panel has room for this many one-line rows without scrolling.
+const RECENT_SHOWN = 5;
+
 function timeText(ms) {
   return new Date(ms).toLocaleTimeString([], { hour: "numeric", minute: "2-digit", second: "2-digit" });
 }
@@ -82,31 +85,25 @@ async function render() {
     render();
   };
   const list = document.getElementById("recent");
-  const scrolled = list.scrollTop;
   list.textContent = "";
-  for (const a of state.recent) {
+  for (const a of state.recent.slice(0, RECENT_SHOWN)) {
     const li = document.createElement("li");
-    const time = document.createElement("span");
-    time.className = "time";
-    time.textContent = timeText(a.time);
     const what = document.createElement("span");
     what.className = "what";
     what.textContent = COMMAND_NAMES[a.command] || a.command;
-    li.append(what, time);
-    const whereText = a.title || a.url || (a.tab !== null ? `tab ${a.tab}` : "");
-    if (whereText) {
-      const where = document.createElement("span");
-      where.className = "where";
-      where.textContent = whereText;
-      li.append(where);
-    }
+    const where = document.createElement("span");
+    where.className = "where";
+    where.textContent = a.title || a.url || (a.tab !== null ? `tab ${a.tab}` : "");
+    const time = document.createElement("span");
+    time.className = "time";
+    time.textContent = timeText(a.time);
+    li.append(what, where, time);
+    li.title = a.error ? `${where.textContent}\n${a.error}` : where.textContent;
     if (a.error) {
       li.classList.add("failed");
-      li.title = a.error;
     }
     list.append(li);
   }
-  list.scrollTop = scrolled;
   document.getElementById("empty").hidden = state.recent.length > 0;
 }
 
