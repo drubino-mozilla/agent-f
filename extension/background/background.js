@@ -291,6 +291,8 @@ function onRuntimeMessage(message, sender) {
         paused,
         connected: !!port && Date.now() - brokerSeen < 5 * 60 * 1000,
         helperRunning: !!port,
+        active: Date.now() < hopUntil,
+        version: browser.runtime.getManifest().version,
         recent: recentActions.slice(-20).reverse(),
       });
     case "set_paused":

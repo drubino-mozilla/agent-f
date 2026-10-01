@@ -1,0 +1,236 @@
+/* This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this
+ * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
+
+/* Colours, radii and shapes follow Firefox's Nova design tokens
+   (toolkit/themes/shared/design-system), which extension pages can't load directly. */
+:root {
+  color-scheme: light dark;
+  --accent: light-dark(#764edd, #b89cff);
+  --accent-hover: light-dark(#5939a8, #d4c1ff);
+  --accent-active: light-dark(#3e2976, #eaddff);
+  --on-accent: light-dark(#ffffff, #252428);
+  --text: light-dark(#180e30, #f2f0f8);
+  --text-muted: light-dark(#584a7d, #b6aad9);
+  --surface: light-dark(#ffffff, #252428);
+  --card: light-dark(#f7f6fb, #1d1b1f);
+  --border: color-mix(in srgb, currentColor 14%, transparent);
+  --muted-button: light-dark(#efedf2, #3f3e42);
+  --muted-button-hover: light-dark(#e7e1f8, #584a7d);
+  --hover: light-dark(rgba(117, 102, 159, 0.14), rgba(182, 170, 217, 0.14));
+  --ok: light-dark(#008865, #4acca6);
+  --bad: light-dark(#c52d4f, #ff8998);
+  --hero: linear-gradient(135deg,
+    color-mix(in srgb, light-dark(#eaddff, #3e315f) 85%, transparent),
+    color-mix(in srgb, light-dark(#ffdbc5, #701c07) 85%, transparent));
+  --radius-card: 12px;
+  --radius-pill: 24px;
+  font: menu;
+  font-size: 13px;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  width: 360px;
+  margin: 0;
+  color: var(--text);
+  background: var(--surface);
+}
+
+.hero {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 20px 20px 18px;
+  background: var(--hero);
+  text-align: center;
+}
+
+.franklin {
+  display: block;
+  filter: drop-shadow(0 6px 10px rgba(0, 0, 0, 0.22));
+}
+
+.franklin.active {
+  animation: hop 0.9s ease-in-out infinite;
+}
+
+@keyframes hop {
+  0%, 55%, 100% { transform: translateY(0); }
+  25% { transform: translateY(-10px); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .franklin.active {
+    animation: none;
+  }
+}
+
+h1 {
+  margin: 10px 0 2px;
+  font-size: 22px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+}
+
+.tagline {
+  margin: 0 0 12px;
+  color: var(--text-muted);
+}
+
+.status {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  margin: 0;
+  padding: 5px 12px;
+  border-radius: var(--radius-pill);
+  background: var(--surface);
+  font-weight: 600;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.12);
+}
+
+.dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--text-muted);
+}
+
+.status.ok .dot { background: var(--ok); }
+.status.bad .dot { background: var(--bad); }
+.status.working .dot {
+  background: var(--accent);
+  animation: pulse 1.2s ease-in-out infinite;
+}
+
+@keyframes pulse {
+  50% { box-shadow: 0 0 0 4px color-mix(in srgb, var(--accent) 30%, transparent); }
+}
+
+main {
+  padding: 14px 16px 4px;
+}
+
+.detail {
+  margin: 0 0 12px;
+  color: var(--text-muted);
+  text-align: center;
+}
+
+.detail strong {
+  color: var(--text);
+}
+
+.pill {
+  display: block;
+  width: 100%;
+  padding: 9px 16px;
+  border: none;
+  border-radius: var(--radius-pill);
+  background: var(--muted-button);
+  color: var(--text);
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.pill:hover { background: var(--muted-button-hover); }
+
+.pill.primary {
+  background: var(--accent);
+  color: var(--on-accent);
+}
+
+.pill.primary:hover { background: var(--accent-hover); }
+.pill.primary:active { background: var(--accent-active); }
+
+button:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.card {
+  margin-top: 14px;
+  padding: 12px 6px 6px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-card);
+  background: var(--card);
+}
+
+h2 {
+  margin: 0 10px 6px;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.recent {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  max-height: 210px;
+  overflow-y: auto;
+}
+
+.recent li {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  column-gap: 10px;
+  padding: 6px 10px;
+  border-radius: 8px;
+}
+
+.recent li:hover { background: var(--hover); }
+
+.recent .what { font-weight: 600; }
+
+.recent .time {
+  color: var(--text-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.recent .where {
+  grid-column: 1 / -1;
+  overflow: hidden;
+  color: var(--text-muted);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.recent li.failed .what { color: var(--bad); }
+.recent li.failed .what::after { content: " (failed)"; font-weight: 400; }
+
+.empty {
+  margin: 4px 10px 8px;
+  color: var(--text-muted);
+}
+
+footer {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 8px 10px 12px;
+}
+
+.ghost {
+  padding: 6px 12px;
+  border: none;
+  border-radius: var(--radius-pill);
+  background: transparent;
+  color: var(--accent);
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.ghost:hover { background: var(--hover); }
+
+.version {
+  margin-inline-start: auto;
+  padding-inline-end: 6px;
+  color: var(--text-muted);
+  font-variant-numeric: tabular-nums;
+}

@@ -46,29 +46,43 @@ function timeText(ms) {
   return new Date(ms).toLocaleTimeString([], { hour: "numeric", minute: "2-digit", second: "2-digit" });
 }
 
+/** The status pill's kind and headline, and the detail line as [before, browser name, after]. */
+function describe(state) {
+  const name = state.label;
+  if (state.paused) {
+    return ["bad", "Paused", ["Agents can't use this Firefox (", name, ") until you resume."]];
+  }
+  if (!state.helperRunning) {
+    return ["bad", "Not connected", ["The Agent F helper isn't running. Check the installation.", "", ""]];
+  }
+  if (state.active) {
+    return ["working", "Agent working", ["An agent is working in this Firefox, as ", name, "."]];
+  }
+  if (state.connected) {
+    return ["ok", "Connected", ["Agents see this Firefox as ", name, "."]];
+  }
+  return ["ok", "Ready", ["Agents see this Firefox as ", name, ". None has used it recently."]];
+}
+
 async function render() {
   const state = await browser.runtime.sendMessage({ type: "panel_state" });
-  const status = document.getElementById("status");
-  if (state.paused) {
-    status.textContent = `Paused. Agents can't use this Firefox (${state.label}) until you resume.`;
-    status.className = "status paused";
-  } else if (state.connected) {
-    status.textContent = `Connected as ${state.label}.`;
-    status.className = "status ok";
-  } else if (state.helperRunning) {
-    status.textContent = `Ready as ${state.label}; no agent has used it recently.`;
-    status.className = "status ok";
-  } else {
-    status.textContent = "Not connected. The Agent F helper isn't running; check the installation.";
-    status.className = "status bad";
-  }
+  const [kind, headline, detail] = describe(state);
+  document.getElementById("status").className = `status ${kind}`;
+  document.getElementById("status-text").textContent = headline;
+  const strong = document.createElement("strong");
+  strong.textContent = detail[1];
+  document.getElementById("detail").replaceChildren(detail[0], ...(detail[1] ? [strong] : []), detail[2]);
+  document.getElementById("franklin").classList.toggle("active", !!state.active && !state.paused);
+  document.getElementById("version").textContent = `Version ${state.version}`;
   const pause = document.getElementById("pause");
   pause.textContent = state.paused ? "Resume Agent F" : "Pause Agent F";
+  pause.classList.toggle("primary", state.paused);
   pause.onclick = async () => {
     await browser.runtime.sendMessage({ type: "set_paused", paused: !state.paused });
     render();
   };
   const list = document.getElementById("recent");
+  const scrolled = list.scrollTop;
   list.textContent = "";
   for (const a of state.recent) {
     const li = document.createElement("li");
@@ -78,23 +92,33 @@ async function render() {
     const what = document.createElement("span");
     what.className = "what";
     what.textContent = COMMAND_NAMES[a.command] || a.command;
-    const where = document.createElement("span");
-    where.className = "where";
-    where.textContent = a.title || a.url || (a.tab !== null ? `tab ${a.tab}` : "");
-    li.append(time, what, where);
+    li.append(what, time);
+    const whereText = a.title || a.url || (a.tab !== null ? `tab ${a.tab}` : "");
+    if (whereText) {
+      const where = document.createElement("span");
+      where.className = "where";
+      where.textContent = whereText;
+      li.append(where);
+    }
     if (a.error) {
       li.classList.add("failed");
       li.title = a.error;
     }
     list.append(li);
   }
+  list.scrollTop = scrolled;
   document.getElementById("empty").hidden = state.recent.length > 0;
 }
 
-document.getElementById("settings").addEventListener("click", e => {
-  e.preventDefault();
+document.getElementById("settings").addEventListener("click", () => {
   browser.runtime.openOptionsPage();
   window.close();
 });
 
+document.getElementById("github").addEventListener("click", () => {
+  browser.tabs.create({ url: "https://github.com/drubino-mozilla/agent-f" });
+  window.close();
+});
+
 render();
+setInterval(render, 2000);

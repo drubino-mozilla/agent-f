@@ -5,19 +5,33 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<link rel="stylesheet" href="ui.css">
+<link rel="stylesheet" href="panel.css">
 </head>
-<body class="panel">
-  <header>
-    <img src="../icons/red-panda-48.png" alt="" width="24" height="24">
+<body>
+  <header class="hero">
+    <img id="franklin" class="franklin" src="franklin-256.png" width="136" height="136"
+         alt="Franklin the Firefox, Agent F's mascot: a red panda in a fedora">
     <h1>Agent F</h1>
+    <p class="tagline">Your AI agent's way into this Firefox.</p>
+    <p id="status" class="status" role="status"><span class="dot"></span><span id="status-text"></span></p>
   </header>
-  <p id="status" class="status"></p>
-  <button id="pause" type="button"></button>
-  <h2>Recent actions</h2>
-  <ol id="recent" class="recent"></ol>
-  <p id="empty" class="muted" hidden>No agent actions yet.</p>
-  <footer><a href="#" id="settings">Settings</a></footer>
+
+  <main>
+    <p id="detail" class="detail"></p>
+    <button id="pause" class="pill" type="button"></button>
+
+    <section class="card" aria-labelledby="recent-heading">
+      <h2 id="recent-heading">Recent actions</h2>
+      <ol id="recent" class="recent"></ol>
+      <p id="empty" class="empty" hidden>No agent actions yet. When an agent works here, its steps show up in this list.</p>
+    </section>
+  </main>
+
+  <footer>
+    <button id="settings" class="ghost" type="button">Settings</button>
+    <button id="github" class="ghost" type="button">GitHub</button>
+    <span id="version" class="version"></span>
+  </footer>
   <script src="panel.js"></script>
 </body>
 </html>
