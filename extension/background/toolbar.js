@@ -7,7 +7,7 @@
 // Makes the toolbar fedora hop while an agent is working.
 
 // Height of the hat above its resting place in each frame, in pixels of the 32-pixel icon.
-const HOP_LIFT = [0, 1, 3, 4, 4, 3, 1, 0, 0, 0, 0, 0, 0];
+const HOP_LIFT = [0, 2, 4, 5, 5, 4, 2, 0, 0, 0, 0, 0, 0];
 const HOP_FRAME_MS = 50;
 const HOP_ACTIVE_MS = 10000;
 const HOP_SIZES = [16, 32];

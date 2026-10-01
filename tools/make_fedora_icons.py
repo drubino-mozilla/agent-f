@@ -1,90 +1,79 @@
-"""Cut Franklin's fedora out of the master artwork and build the toolbar icons from it.
+"""Draw Franklin's fedora, front on, and build the toolbar icons from it.
 
-    uv run --with pillow --with numpy --with scipy python tools/make_fedora_icons.py
+    uv run --with resvg-py python tools/make_fedora_icons.py
 
-Writes assets/fedora.png (the hat at full size) and extension/icons/fedora-{16,32,64}.png
-(dark outline, for light toolbars) and fedora-light-{16,32,64}.png (a soft cream edge, for dark toolbars).
+The colours and outline follow the mascot artwork. Writes assets/fedora.svg and assets/fedora.png (512 px),
+and extension/icons/fedora-{16,32,64}.png (for light toolbars) and fedora-light-{16,32,64}.png (with a
+soft cream edge, for dark toolbars). The hat spans the icon's width and sits in the lower part of its
+height, leaving room above for the hop in background/toolbar.js.
 """
 
 from pathlib import Path
 
-import numpy as np
-from PIL import Image
-from scipy import ndimage
+import resvg_py
 
 REPO = Path(__file__).resolve().parents[1]
 ICONS = REPO / "extension" / "icons"
-# Degrees to straighten the hat. 0 keeps Franklin's angle, which also fills a square icon best.
-TILT = 0
-CREAM = (244, 230, 210)
+
+OUTLINE = "#1e0a08"
+FELT_LIGHT = "#9a5c37"
+FELT = "#7a4629"
+FELT_SHADOW = "#5e3220"
+BAND = "#241a1c"
+BAND_LIGHT = "#3a2c2c"
+CREAM = "#f4e6d2"
+
+# Drawn on a 64-unit square; the hat spans x 4-60 and y 13-55.
+CROWN = ("M16.6 46 C16 37 17 29.5 19.4 23.6 C21.6 18.4 26.6 16.2 32 19.6 "
+         "C37.4 16.2 42.4 18.4 44.6 23.6 C47 29.5 48 37 47.4 46 Z")
+CROWN_LIGHT = "M19.6 44 C19.2 36 20 29.8 22 25 C23.6 21.2 26.8 19.6 30 20.8 C28 27 27.4 35 27.8 44 Z"
+CROWN_SHADOW = "M44.4 44 C44.8 36 44 29.8 42 25 C40.4 21.2 37.2 19.6 34 20.8 C36 27 36.6 35 36.2 44 Z"
+CREASE = "M32 19.6 C31.2 23 31.2 26.6 32 30"
+BAND_SHAPE = "M17.2 35.5 C26 37.8 38 37.8 46.8 35.5 L47 43 C38 45.4 26 45.4 17 43 Z"
+BAND_SHINE = "M19.5 37.4 C25 38.8 30 39.2 34 39.2"
+BRIM = ("M4.5 41.5 C8 39.6 12.5 41.2 17 43.6 C26 46.4 38 46.4 47 43.6 C51.5 41.2 56 39.6 59.5 41.5 "
+        "C57.5 49.5 46 54.5 32 54.5 C18 54.5 6.5 49.5 4.5 41.5 Z")
+BRIM_LIGHT = "M8 43.2 C12 42.6 15.5 44.4 18.5 46.2 C26 48.6 38 48.6 45.5 46.2 C40 50.2 24 50.6 13.5 47.8 C10.8 46.6 9 45 8 43.2 Z"
 
 
-def cut_fedora() -> Image.Image:
-    rgba = np.asarray(Image.open(REPO / "assets" / "red-panda-master.png").convert("RGBA")).astype(np.float32)
-    rgb, alpha = rgba[..., :3] / 255.0, rgba[..., 3]
-    r, g, b = rgb[..., 0], rgb[..., 1], rgb[..., 2]
-    mx, mn = rgb.max(-1), rgb.min(-1)
-    sat = np.where(mx > 0, (mx - mn) / np.maximum(mx, 1e-6), 0)
-    height, width = alpha.shape
-    rows = np.arange(height)[:, None].repeat(width, 1)
-
-    # The hat's felt is the only mid-brown, mid-saturation area in the top half (the coat is lower down).
-    brown = (alpha > 128) & (r >= g) & (g >= b * 0.9) & (sat > 0.2) & (sat < 0.72) & (mx > 0.22) & (mx < 0.72)
-    brown &= rows < int(height * 0.56)
-    labels, count = ndimage.label(brown)
-    sizes = ndimage.sum(brown, labels, range(1, count + 1))
-    parts = [i + 1 for i, s in enumerate(sizes) if s > sizes.max() * 0.08]
-    parts.sort(key=lambda k: ndimage.center_of_mass(labels == k)[0])
-    crown, brim = labels == parts[0], labels == parts[1]
-    hat = crown | brim
-
-    # The dark band separates crown and brim; take the dark and brown pixels between them, column by column.
-    band = (alpha > 128) & ((mx < 0.35) | brown)
-    for x in range(width):
-        above, below = np.nonzero(crown[:, x])[0], np.nonzero(brim[:, x])[0]
-        if len(above) and len(below) and below.min() > above.max():
-            span = slice(above.max(), below.min() + 1)
-            hat[span, x] |= band[span, x]
-
-    hat = ndimage.binary_fill_holes(ndimage.binary_closing(hat, structure=np.ones((3, 3)), iterations=12))
-    fur = (alpha > 128) & (((sat > 0.72) & (r > 0.55)) | ((mx > 0.8) & (sat < 0.35)))
-    body = hat & ~fur
-    outline = ndimage.binary_dilation(body, iterations=14) & (alpha > 128) & (mx < 0.3)
-    mask = ndimage.binary_opening(ndimage.binary_fill_holes(body | outline), iterations=2)
-    labels, count = ndimage.label(mask)
-    mask = labels == (int(np.argmax(ndimage.sum(mask, labels, range(1, count + 1)))) + 1)
-
-    out = rgba.copy()
-    out[..., 3] = np.minimum(alpha, ndimage.gaussian_filter(mask.astype(np.float32), 1.0) * 255)
-    ys, xs = np.nonzero(mask)
-    hat_img = Image.fromarray(out.astype(np.uint8), "RGBA").crop((xs.min(), ys.min(), xs.max() + 1, ys.max() + 1))
-    level = hat_img.rotate(TILT, resample=Image.BICUBIC, expand=True)
-    return level.crop(level.getbbox())
+def svg(edge_width: float = 0) -> str:
+    """The hat; edge_width > 0 adds the cream edge used on dark toolbars."""
+    stroke = f'stroke="{OUTLINE}" stroke-width="3.2" stroke-linejoin="round" stroke-linecap="round"'
+    under = ""
+    if edge_width:
+        cream = f'fill="{CREAM}" stroke="{CREAM}" stroke-width="{edge_width}" stroke-linejoin="round" opacity="0.62"'
+        under = f'<g {cream}><path d="{CROWN}"/><path d="{BRIM}"/></g>'
+    # Stretched to reach the icon's edges, and resting low so it has room to hop.
+    return f"""<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64">
+  <g transform="matrix(1.07 0 0 1 -2.24 3.5)">
+  {under}
+  <path d="{CROWN}" fill="{FELT}" {stroke}/>
+  <path d="{CROWN_LIGHT}" fill="{FELT_LIGHT}"/>
+  <path d="{CROWN_SHADOW}" fill="{FELT_SHADOW}"/>
+  <path d="{CROWN}" fill="none" {stroke}/>
+  <path d="{CREASE}" fill="none" stroke="{OUTLINE}" stroke-width="2" stroke-linecap="round"/>
+  <path d="{BAND_SHAPE}" fill="{BAND}" {stroke}/>
+  <path d="{BAND_SHINE}" fill="none" stroke="{BAND_LIGHT}" stroke-width="1.6" stroke-linecap="round"/>
+  <path d="{BRIM}" fill="{FELT}" {stroke}/>
+  <path d="{BRIM_LIGHT}" fill="{FELT_LIGHT}"/>
+  <path d="{BRIM}" fill="none" {stroke}/>
+  </g>
+</svg>
+"""
 
 
-def icon(level: Image.Image, size: int, edge_alpha: int = 0) -> Image.Image:
-    """The hat as wide as the icon allows, vertically centred, with an optional cream edge."""
-    margin = 1 if edge_alpha else 0
-    width = size - 2 * margin
-    hat = level.resize((width, round(level.height * width / level.width)), Image.LANCZOS)
-    canvas = Image.new("RGBA", (size, size))
-    canvas.alpha_composite(hat, (margin, (size - hat.height) // 2))
-    if edge_alpha:
-        grown = ndimage.binary_dilation(np.asarray(canvas)[..., 3] > 40, iterations=max(1, size // 32))
-        edge = Image.new("RGBA", (size, size), CREAM + (0,))
-        edge.putalpha(Image.fromarray((grown * edge_alpha).astype(np.uint8)))
-        edge.alpha_composite(canvas)
-        canvas = edge
-    return canvas
+def render(source: str, size: int, path: Path) -> None:
+    path.write_bytes(bytes(resvg_py.svg_to_bytes(svg_string=source, width=size, height=size)))
 
 
 def main() -> None:
-    level = cut_fedora()
-    level.save(REPO / "assets" / "fedora.png", optimize=True)
+    plain = svg()
+    (REPO / "assets" / "fedora.svg").write_text(plain, encoding="utf-8")
+    render(plain, 512, REPO / "assets" / "fedora.png")
     for size in (16, 32, 64):
-        icon(level, size).save(ICONS / f"fedora-{size}.png", optimize=True)
-        icon(level, size, 100 if size == 16 else 165).save(ICONS / f"fedora-light-{size}.png", optimize=True)
-    print(f"fedora {level.size}; icons in {ICONS}")
+        render(plain, size, ICONS / f"fedora-{size}.png")
+        render(svg(edge_width=5 if size == 16 else 7), size, ICONS / f"fedora-light-{size}.png")
+    print(f"icons in {ICONS}")
 
 
 if __name__ == "__main__":
