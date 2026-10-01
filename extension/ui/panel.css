@@ -49,24 +49,29 @@ body {
   text-align: center;
 }
 
+/* At rest Franklin is the untouched artwork. While an agent works he becomes blank-eyed artwork
+   plus franklin-eyes.svg, whose irises glance from side to side. */
 .franklin {
-  display: block;
+  position: relative;
+  width: 136px;
+  height: 136px;
   filter: drop-shadow(0 6px 10px rgba(0, 0, 0, 0.22));
 }
 
-.franklin.active {
-  animation: hop 0.9s ease-in-out infinite;
+.franklin img {
+  position: absolute;
+  inset: 0;
 }
 
-@keyframes hop {
-  0%, 55%, 100% { transform: translateY(0); }
-  25% { transform: translateY(-10px); }
+.franklin .blank,
+.franklin .eyes,
+.franklin.active .still {
+  visibility: hidden;
 }
 
-@media (prefers-reduced-motion: reduce) {
-  .franklin.active {
-    animation: none;
-  }
+.franklin.active .blank,
+.franklin.active .eyes {
+  visibility: visible;
 }
 
 h1 {

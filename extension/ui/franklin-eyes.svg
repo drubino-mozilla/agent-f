@@ -1,0 +1,35 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1254 1254" width="1254" height="1254">
+  <style>
+    .look { animation: shifty 3.4s ease-in-out infinite; }
+    @keyframes shifty {
+      0%, 16% { transform: translateX(0); }
+      26%, 50% { transform: translateX(60px); }
+      60%, 68% { transform: translateX(0); }
+      74%, 84% { transform: translateX(30px); }
+      92%, 100% { transform: translateX(0); }
+    }
+    @media (prefers-reduced-motion: reduce) { .look { animation: none; } }
+  </style>
+  <defs>
+    <clipPath id="left"><polygon points="424,560 470,572 518,586 607,611 606,622 600,637 587,653 553,669 520,670 487,660 462,644 445,628 432,610 425,590"/></clipPath>
+    <clipPath id="right"><polygon points="780,629 815,632 850,634 927,630 926,650 922,670 907,692 873,706 840,706 812,694 795,684 785,668 780,645"/></clipPath>
+  </defs>
+  <g clip-path="url(#left)">
+    <g class="look">
+      <circle cx="470" cy="594" r="46" fill="#1a0605"/>
+      <circle cx="470" cy="596" r="39" fill="#5e1a13"/>
+      <circle cx="476" cy="586" r="33" fill="#1a0605"/>
+      <ellipse cx="451" cy="581" rx="11" ry="8" transform="rotate(-25 451 581)" fill="#fffaf5"/>
+    </g>
+    <polygon points="424,560 470,572 518,586 607,611 607,623 518,598 470,584 424,572" fill="rgb(90, 60, 50)" fill-opacity="0.16"/>
+  </g>
+  <g clip-path="url(#right)">
+    <g class="look">
+      <circle cx="813" cy="656" r="37" fill="#1a0605"/>
+      <circle cx="813" cy="658" r="31" fill="#5e1a13"/>
+      <circle cx="818" cy="650" r="26" fill="#1a0605"/>
+      <ellipse cx="793" cy="644" rx="9" ry="7" transform="rotate(-25 793 644)" fill="#fffaf5"/>
+    </g>
+    <polygon points="780,629 815,632 850,634 927,630 927,642 850,646 815,644 780,641" fill="rgb(90, 60, 50)" fill-opacity="0.16"/>
+  </g>
+</svg>
