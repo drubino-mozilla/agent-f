@@ -1,7 +1,7 @@
 {
   "manifest_version": 2,
   "name": "Agent F",
-  "version": "0.4.1",
+  "version": "0.4.2",
   "homepage_url": "https://github.com/drubino-mozilla/agent-f",
   "developer": {
     "name": "David Rubino",
@@ -48,15 +48,22 @@
       "background/page.js",
       "background/capture.js",
       "background/data.js",
+      "background/toolbar.js",
       "background/background.js"
     ],
     "persistent": true
   },
   "browser_action": {
     "default_icon": {
-      "16": "icons/red-panda-16.png",
-      "32": "icons/red-panda-32.png"
+      "16": "icons/fedora-16.png",
+      "32": "icons/fedora-32.png",
+      "64": "icons/fedora-64.png"
     },
+    "theme_icons": [
+      { "light": "icons/fedora-light-16.png", "dark": "icons/fedora-16.png", "size": 16 },
+      { "light": "icons/fedora-light-32.png", "dark": "icons/fedora-32.png", "size": 32 },
+      { "light": "icons/fedora-light-64.png", "dark": "icons/fedora-64.png", "size": 64 }
+    ],
     "default_title": "Agent F",
     "default_popup": "ui/panel.html"
   },

@@ -15,10 +15,9 @@ let paused = false;
 let brokerSeen = 0;
 let dialogDefaults = null;
 
-// The toolbar panel's list of recent Agent F actions, and the badge shown while an agent is active.
+// The toolbar panel's list of recent Agent F actions; each one also makes the toolbar fedora hop.
 const recentActions = [];
 const QUIET_COMMANDS = new Set(["ping", "resolve_tab", "upload_chunk", "reload_extension"]);
-let badgeTimer = null;
 
 function recordAction(command, params, result, error) {
   if (QUIET_COMMANDS.has(command)) {
@@ -36,10 +35,7 @@ function recordAction(command, params, result, error) {
   if (recentActions.length > 30) {
     recentActions.splice(0, recentActions.length - 30);
   }
-  browser.browserAction.setBadgeBackgroundColor({ color: "#ff7139" });
-  browser.browserAction.setBadgeText({ text: "F" });
-  clearTimeout(badgeTimer);
-  badgeTimer = setTimeout(() => browser.browserAction.setBadgeText({ text: "" }), 60000);
+  hop();
 }
 
 async function setPaused(value) {

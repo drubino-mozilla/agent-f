@@ -94,7 +94,7 @@ The extension lives in `extension/`.
 - Permissions: `tabs`, `tabGroups`, `webNavigation`, `webRequest`, `webRequestBlocking`, `contextualIdentities`, `cookies` (only to map containers to tabs), `history`, `bookmarks`, `downloads`, `sessions`, `find`, `storage`, `nativeMessaging`, `notifications`, and `<all_urls>`.
 - The background page holds the native port, routes commands, reports events, manages the tab group, captures network traffic and takes screenshots.
 - A content script runs in every frame at `document_start`. It builds snapshots, keeps the element-ref map, performs input, reads text, wraps the page's dialog and console functions (sections 7.6 and 7.7), and watches for your own input in tabs agents are using (section 6.3).
-- The toolbar button shows the connection state, and a badge while an agent has acted in the last minute. Its panel lists recent actions and has a Pause Agent F switch; while paused, every tool call fails with "paused by the user".
+- The toolbar button is Franklin's fedora, cut from the mascot artwork by `tools/make_fedora_icons.py`; the whole red panda was unreadable at 16 pixels. It has a variant with a light edge for dark toolbars (`theme_icons`). The fedora hops while an agent is working, until 10 seconds after its latest call: `background/toolbar.js` pre-renders the frames and cycles them with `browserAction.setIcon`, then clears the override. Its panel lists recent actions and has a Pause Agent F switch; while paused, every tool call fails with "paused by the user".
 - The options page sets the browser label, shown to agents as the profile name, and the default dialog policy.
 
 ### 4.4 Message contract
@@ -400,7 +400,7 @@ Agent F gives an agent full control of your web sessions. The threats and mitiga
 - Prompt injection from page content, the most realistic risk:
   - page-derived text is marked as untrusted (section 6.4);
   - the instructions list actions to confirm with you first;
-  - the toolbar badge and action list make activity visible;
+  - the hopping toolbar fedora and the action list make activity visible;
   - Pause Agent F stops everything instantly;
   - the audit log records every call.
 - Passwords. Agent F's reading tools redact password field values in snapshots, `get_html` and `read_page`. `eval_page` could still read a filled field. That is accepted: the agent works for you, and the instructions tell it not to.
