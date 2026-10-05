@@ -11,7 +11,8 @@
 
 The Windows and macOS installers (packaging/) ship a copy of this script next to a Python runtime that already
 has the broker in it, plus the signed add-on and a bundle.json. With bundle.json present it uses that runtime
-instead of building a venv, takes the add-on from the bundle, and logs to logs/install.log in the data folder.
+instead of building a venv, takes the add-on from the bundle, leaves ~/.cursor/mcp.json alone, and logs to
+logs/install.log in the data folder.
 """
 
 import argparse
@@ -337,7 +338,8 @@ def install(args) -> int:
     stop_broker()
     running = start_broker(cfg)
     step("broker running" if running else f"broker did not start; see {data_dir() / 'logs' / 'broker.log'}")
-    if not args.no_cursor:
+    # The packaged installers leave MCP clients' settings to the user.
+    if not args.no_cursor and not BUNDLE:
         update_cursor_config(cfg, token)
     if args.addon or args.profile:
         bundled_xpi = REPO / "addon" / "agent-f.xpi"
@@ -358,7 +360,8 @@ def uninstall(args) -> None:
         save_config(cfg)
     stop_broker()
     step("broker stopped")
-    remove_cursor_config()
+    if not BUNDLE:
+        remove_cursor_config()
     if BUNDLE:
         for path in OS.remove_bundle(REPO):
             step(f"removed {path}")

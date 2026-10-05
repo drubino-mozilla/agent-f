@@ -35,10 +35,10 @@ MinVersion=10.0
 CloseApplications=no
 
 [Messages]
-WelcomeLabel2=This installs [name/ver], which lets AI agents such as Cursor work in the Firefox you're already using.%n%nIt sets up a small local server for your Windows account, adds the Agent F add-on to Firefox, and connects Cursor if you have it. It doesn't need administrator rights.%n%nIf Agent F is already installed, this updates it.
+WelcomeLabel2=This installs [name/ver], which lets AI agents work in the Firefox you're already using.%n%nIt sets up a small local server for your Windows account and adds the Agent F add-on to Firefox. It doesn't need administrator rights.%n%nIf Agent F is already installed, this updates it.
 FinishedHeadingLabel=Agent F is installed
-FinishedLabelNoIcons=Restart Firefox, then enable Agent F from the notice on Firefox's menu button. If you use Cursor, restart it too: Agent F is already in its MCP settings.%n%nTo update Agent F later, run a newer installer. To remove it, use Settings > Apps.
-FinishedLabel=Restart Firefox, then enable Agent F from the notice on Firefox's menu button. If you use Cursor, restart it too: Agent F is already in its MCP settings.%n%nTo update Agent F later, run a newer installer. To remove it, use Settings > Apps.
+FinishedLabelNoIcons=Restart Firefox, then enable Agent F from the notice on Firefox's menu button. Then add Agent F to your AI app as an MCP server: "Connect your AI app" at drubino-mozilla.github.io/agent-f explains how.%n%nTo update Agent F later, run a newer installer. To remove it, use Settings > Apps.
+FinishedLabel=Restart Firefox, then enable Agent F from the notice on Firefox's menu button. Then add Agent F to your AI app as an MCP server: "Connect your AI app" at drubino-mozilla.github.io/agent-f explains how.%n%nTo update Agent F later, run a newer installer. To remove it, use Settings > Apps.
 
 [Files]
 Source: "{#Icon}"; DestDir: "{app}"; DestName: "agent-f.ico"; Flags: ignoreversion

@@ -25,6 +25,8 @@
   .buttons { display: flex; gap: .75rem; justify-content: center; flex-wrap: wrap; margin: 1.5rem 0 .5rem; }
   .buttons a { text-decoration: none; padding: .6rem 1.1rem; border-radius: 8px; border: 2px solid var(--accent); font-weight: 600; }
   .buttons a.primary { background: var(--accent); color: white; }
+  pre { background: color-mix(in srgb, currentColor 10%, transparent); padding: .75rem 1rem; border-radius: 6px; overflow-x: auto; }
+  pre code { background: none; padding: 0; }
   .fineprint { text-align: center; font-size: .9rem; opacity: .75; margin: .3rem 0 0; }
   footer { margin-top: 3rem; font-size: .9rem; opacity: .75; text-align: center; }
 </style>
@@ -58,13 +60,21 @@
   <li><strong>Windows 10 or 11:</strong> <a href="https://github.com/drubino-mozilla/agent-f/releases/latest/download/Agent-F-Windows.exe">Agent-F-Windows.exe</a>. It installs for your Windows account only, without administrator rights.</li>
   <li><strong>macOS 11 or later</strong>, Apple silicon or Intel: <a href="https://github.com/drubino-mozilla/agent-f/releases/latest/download/Agent-F-macOS.pkg">Agent-F-macOS.pkg</a>. It installs into your home folder, without an administrator password.</li>
 </ul>
-<p>The installer sets up Agent F, adds the add-on to Firefox and connects Cursor if you have it. Then restart Firefox and enable Agent F from the notice on Firefox's menu button. To connect another MCP client, see the <a href="https://github.com/drubino-mozilla/agent-f#install">README</a>.</p>
+<p>The installer sets up Agent F and adds the add-on to Firefox. Then restart Firefox, enable Agent F from the notice on Firefox's menu button, and connect your AI app as below.</p>
 <p>The installers aren't signed by Microsoft or Apple yet, so the first time, your computer warns you about them:</p>
 <ul>
   <li>Windows: if your browser says the file isn't commonly downloaded, choose to keep it. When Windows says "Windows protected your PC", choose <strong>More info</strong>, then <strong>Run anyway</strong>.</li>
   <li>macOS: when it says Apple can't check the package for malware, choose <strong>Done</strong>, open <strong>System Settings &gt; Privacy &amp; Security</strong>, scroll down and choose <strong>Open Anyway</strong>. On macOS 14 or earlier, you can instead Control-click the file and choose <strong>Open</strong>.</li>
 </ul>
 <p><strong>Updating:</strong> the add-on updates itself. For the rest, download and run the newest installer; it keeps your settings. <strong>Removing:</strong> on Windows, use <strong>Settings &gt; Apps &gt; Agent F</strong>. On macOS, open <strong>Uninstall Agent F</strong> in the Applications folder in your home folder.</p>
+
+<h2 id="connect">Connect your AI app</h2>
+<p>Add Agent F to your AI app (Cursor, Claude Code, VS Code or any other MCP client) as an MCP server at <code>http://127.0.0.1:47470/mcp</code>, with the header <code>Authorization: Bearer</code> followed by your token. The token is the contents of the <code>token</code> file in Agent F's folder: <code>%LOCALAPPDATA%\agent-f</code> on Windows, <code>~/Library/Application Support/agent-f</code> on a Mac. Treat it like a password. In Cursor, for example, that's this entry under <code>mcpServers</code> in <code>~/.cursor/mcp.json</code>:</p>
+<pre><code>"agent-f": {
+  "url": "http://127.0.0.1:47470/mcp",
+  "headers": { "Authorization": "Bearer &lt;your token&gt;" }
+}</code></pre>
+<p>If something else was already using port 47470, the installer picked another one; <code>config.json</code> in the same folder says which.</p>
 
 <h2>You stay in control</h2>
 <p>Everything stays on your computer. The broker listens only on <code>127.0.0.1</code> and needs a secret token, and web pages can't reach it. The fedora toolbar button shows what agents are doing and has a Pause switch, and every call goes into a local audit log. Firefox needs no special flags, and sites see an ordinary browser.</p>

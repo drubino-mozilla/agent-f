@@ -30,10 +30,14 @@ You need Firefox 140 or later, on any channel. Download the installer for your c
 - Windows 10 or 11: `Agent-F-Windows.exe`. It installs for your Windows account only, without administrator rights.
 - macOS 11 or later, Apple silicon or Intel: `Agent-F-macOS.pkg`. It installs into your home folder, without an administrator password.
 
-Each installer carries its own Python, so there's nothing else to install. It sets up the broker and the helper, starts the broker at login, puts the signed add-on into the profile each Firefox installation starts with, and adds an `agent-f` entry to Cursor's `~/.cursor/mcp.json` if you have Cursor. Then:
+Each installer carries its own Python, so there's nothing else to install. It sets up the broker and the helper, starts the broker at login, and puts the signed add-on into the profile each Firefox installation starts with. It doesn't change any MCP client's settings. Then:
 
 1. Restart Firefox. Its menu button shows a notice that Agent F was added; open it and enable the add-on.
-2. Restart your MCP client. For clients other than Cursor, add a server with the URL `http://127.0.0.1:47470/mcp` and an `Authorization: Bearer <token>` header. The token is in the `token` file in the data folder (see below).
+2. Add Agent F to your MCP client as a server with the URL `http://127.0.0.1:47470/mcp` and an `Authorization: Bearer <token>` header. The token is the contents of the `token` file in the data folder (see below); treat it like a password. If port 47470 was taken, `config.json` there has the one the installer picked. In Cursor, for example, add this under `mcpServers` in `~/.cursor/mcp.json`:
+
+   ```json
+   "agent-f": {"url": "http://127.0.0.1:47470/mcp", "headers": {"Authorization": "Bearer <token>"}}
+   ```
 
 The installers aren't signed by Microsoft or Apple yet, so the first time you open one, Windows shows "Windows protected your PC" (choose More info, then Run anyway), and macOS says it can't check the package (choose Done, then Open Anyway in System Settings > Privacy & Security).
 
@@ -50,7 +54,7 @@ You need Python 3.11 or later and git. [uv](https://docs.astral.sh/uv/) makes th
    - Windows: double-click `install\Install Agent F.cmd`, or run `py -3 install/install.py --addon`.
    - macOS: double-click `install/Install Agent F.command`, or run `python3 install/install.py --addon`.
    - Linux: run `python3 install/install.py --addon`.
-3. Restart Firefox and your MCP client, as above.
+3. Restart Firefox, as above. A clone install also adds the `agent-f` entry to Cursor's `~/.cursor/mcp.json` if you have Cursor (`--no-cursor` skips that); for other clients, add it as above.
 
 `--addon` puts the signed add-on into the profile each Firefox installation starts with, unless it's already there. Use `--profile NAME` (repeatable) for other profiles, and `--list-profiles` to see their names. You can also install the add-on from the [latest release](https://github.com/drubino-mozilla/agent-f/releases/latest) by opening the `.xpi` file in Firefox.
 

@@ -3,8 +3,8 @@
     python packaging/smoke_test.py windows dist/Agent-F-Windows.exe
     python packaging/smoke_test.py macos dist/Agent-F-macOS.pkg
 
-It sets up a Firefox profile and a Cursor folder, installs, and checks the broker, the helper registration, the
-add-on and Cursor's entry. Then it starts Firefox headless and waits for the add-on to connect through the
+It sets up a Firefox profile and a Cursor folder, installs, and checks the broker, the helper registration and
+the add-on, and that Cursor's settings were left alone. Then it starts Firefox headless and waits for the add-on to connect through the
 helper, runs the installer again while Firefox stays connected (the update path), and waits for it to
 reconnect. Last, it uninstalls and checks that nothing is left running or registered.
 """
@@ -28,6 +28,7 @@ OS = platforms.current()
 HOME = Path.home()
 PROFILE = OS.firefox_roots()[0] / "Profiles" / "smoke.default-release"
 CURSOR = HOME / ".cursor" / "mcp.json"
+CURSOR_SERVERS = {"other": {"url": "http://example.invalid/mcp"}}
 APP = (Path(os.environ.get("LOCALAPPDATA", "")) / "Programs" / "Agent F" if OS.name == "windows"
        else data_dir() / "app")
 PYTHON = APP / "runtime" / ("python.exe" if OS.name == "windows" else "bin/python3")
@@ -67,7 +68,7 @@ def prepare() -> None:
         'user_pref("app.update.disabledForTesting", true);',
     ]) + "\n", encoding="utf-8")
     CURSOR.parent.mkdir(parents=True, exist_ok=True)
-    CURSOR.write_text(json.dumps({"mcpServers": {"other": {"url": "http://example.invalid/mcp"}}}), encoding="utf-8")
+    CURSOR.write_text(json.dumps({"mcpServers": CURSOR_SERVERS}), encoding="utf-8")
 
 
 def install(installer: Path) -> None:
@@ -107,8 +108,7 @@ def check_installed(label: str) -> None:
     check(Path(config()["broker_command"][0]).parent == PYTHON.parent, "broker runs the bundled Python")
     check(native_host_registered(), "native-messaging helper registered")
     check((PROFILE / "extensions" / f"{ADDON_ID}.xpi").exists(), "add-on in the default profile")
-    servers = json.loads(CURSOR.read_text(encoding="utf-8"))["mcpServers"]
-    check("agent-f" in servers and "other" in servers, "Cursor entry added, other entries kept")
+    check(json.loads(CURSOR.read_text(encoding="utf-8"))["mcpServers"] == CURSOR_SERVERS, "Cursor's settings untouched")
     if OS.name == "macos":
         check((HOME / "Applications" / "Uninstall Agent F.app").exists(), "Uninstall Agent F in ~/Applications")
 
@@ -145,7 +145,7 @@ def uninstall() -> None:
     check(not data_dir().exists(), "data folder removed")
     check(not native_host_registered(), "native-messaging helper unregistered")
     check(not listening(47470), "broker stopped")
-    check("agent-f" not in json.loads(CURSOR.read_text(encoding="utf-8"))["mcpServers"], "Cursor entry removed")
+    check(json.loads(CURSOR.read_text(encoding="utf-8"))["mcpServers"] == CURSOR_SERVERS, "Cursor's settings untouched")
     if OS.name == "windows":
         import winreg
         key = r"Software\Microsoft\Windows\CurrentVersion\Uninstall\{5E0C9B54-4A57-4C1E-9F3B-AF52A7B8E1D3}_is1"
