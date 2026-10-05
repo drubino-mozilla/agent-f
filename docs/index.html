@@ -10,7 +10,8 @@
 <meta property="og:image" content="https://drubino-mozilla.github.io/agent-f/social-preview.png">
 <meta property="og:image:width" content="1280">
 <meta property="og:image:height" content="640">
-<link rel="icon" href="favicon.png">
+<link rel="icon" href="favicon.svg" type="image/svg+xml">
+<link rel="icon" href="favicon.png" type="image/png" sizes="64x64">
 <style>
   :root { color-scheme: light dark; --accent: #e25920; }
   body { font: 17px/1.55 system-ui, sans-serif; max-width: 44rem; margin: 0 auto; padding: 2.5rem 1.25rem 4rem; }
@@ -24,6 +25,7 @@
   .buttons { display: flex; gap: .75rem; justify-content: center; flex-wrap: wrap; margin: 1.5rem 0 .5rem; }
   .buttons a { text-decoration: none; padding: .6rem 1.1rem; border-radius: 8px; border: 2px solid var(--accent); font-weight: 600; }
   .buttons a.primary { background: var(--accent); color: white; }
+  .fineprint { text-align: center; font-size: .9rem; opacity: .75; margin: .3rem 0 0; }
   footer { margin-top: 3rem; font-size: .9rem; opacity: .75; text-align: center; }
 </style>
 </head>
@@ -32,11 +34,11 @@
   <img src="red-panda-256.png" alt="Franklin the Firefox, a red panda in a fedora">
   <h1>Agent F</h1>
   <p class="tagline">Let AI agents work in the Firefox you're already using.</p>
-  <div class="buttons">
-    <a class="primary" href="https://github.com/drubino-mozilla/agent-f#install">Install</a>
-    <a href="https://github.com/drubino-mozilla/agent-f">Source on GitHub</a>
-    <a href="https://github.com/drubino-mozilla/agent-f/releases/latest">Latest release</a>
+  <div class="buttons" id="downloads">
+    <a class="primary" id="windows" href="https://github.com/drubino-mozilla/agent-f/releases/latest/download/Agent-F-Windows.exe">Download for Windows</a>
+    <a id="macos" href="https://github.com/drubino-mozilla/agent-f/releases/latest/download/Agent-F-macOS.pkg">Download for macOS</a>
   </div>
+  <p class="fineprint"><span id="version"></span>Windows 10 or later, macOS 11 or later &middot; <a href="https://github.com/drubino-mozilla/agent-f/releases">All releases</a> &middot; <a href="https://github.com/drubino-mozilla/agent-f">Source on GitHub</a></p>
 </header>
 
 <p>Agent F connects any MCP client, such as Cursor or Claude, to your running Firefox: your profiles, your tabs and your signed-in sessions. The agent works in background tabs while you keep browsing, and never takes focus. Every result tells it what changed since its last step, so it keeps up when you close a tab or a page navigates on its own.</p>
@@ -51,14 +53,38 @@
 </ul>
 
 <h2>Install</h2>
-<p>You need Firefox 140 or later, Python 3.11 or later, and git. The easiest way is to ask your agent: <em>"Clone github.com/drubino-mozilla/agent-f and run its installer with --addon."</em> The <a href="https://github.com/drubino-mozilla/agent-f#install">README</a> has the manual steps for Windows, macOS and Linux. The add-on updates itself.</p>
+<p>You need Firefox 140 or later, on any channel. Download the installer for your computer and open it:</p>
+<ul>
+  <li><strong>Windows 10 or 11:</strong> <a href="https://github.com/drubino-mozilla/agent-f/releases/latest/download/Agent-F-Windows.exe">Agent-F-Windows.exe</a>. It installs for your Windows account only, without administrator rights.</li>
+  <li><strong>macOS 11 or later</strong>, Apple silicon or Intel: <a href="https://github.com/drubino-mozilla/agent-f/releases/latest/download/Agent-F-macOS.pkg">Agent-F-macOS.pkg</a>. It installs into your home folder, without an administrator password.</li>
+</ul>
+<p>The installer sets up Agent F, adds the add-on to Firefox and connects Cursor if you have it. Then restart Firefox and enable Agent F from the notice on Firefox's menu button. To connect another MCP client, see the <a href="https://github.com/drubino-mozilla/agent-f#install">README</a>.</p>
+<p>The installers aren't signed by Microsoft or Apple yet, so the first time, your computer warns you about them:</p>
+<ul>
+  <li>Windows: if your browser says the file isn't commonly downloaded, choose to keep it. When Windows says "Windows protected your PC", choose <strong>More info</strong>, then <strong>Run anyway</strong>.</li>
+  <li>macOS: when it says Apple can't check the package for malware, choose <strong>Done</strong>, open <strong>System Settings &gt; Privacy &amp; Security</strong>, scroll down and choose <strong>Open Anyway</strong>. On macOS 14 or earlier, you can instead Control-click the file and choose <strong>Open</strong>.</li>
+</ul>
+<p><strong>Updating:</strong> the add-on updates itself. For the rest, download and run the newest installer; it keeps your settings. <strong>Removing:</strong> on Windows, use <strong>Settings &gt; Apps &gt; Agent F</strong>. On macOS, open <strong>Uninstall Agent F</strong> in the Applications folder in your home folder.</p>
 
 <h2>You stay in control</h2>
-<p>Everything stays on your computer. The broker listens only on <code>127.0.0.1</code> and needs a secret token, and web pages can't reach it. The red panda toolbar button shows what agents are doing and has a Pause switch, and every call goes into a local audit log. Firefox needs no special flags, and sites see an ordinary browser.</p>
+<p>Everything stays on your computer. The broker listens only on <code>127.0.0.1</code> and needs a secret token, and web pages can't reach it. The fedora toolbar button shows what agents are doing and has a Pause switch, and every call goes into a local audit log. Firefox needs no special flags, and sites see an ordinary browser.</p>
 
 <footer>
   <p>Franklin the Firefox is a nod to Perry the Platypus, whose secret identity is Agent P. The red panda is the animal Firefox is named after.</p>
   <p>MPL-2.0 &middot; <a href="https://github.com/drubino-mozilla/agent-f">github.com/drubino-mozilla/agent-f</a> &middot; <a href="updates.json">update manifest</a></p>
 </footer>
+<script>
+  const mac = navigator.userAgentData ? navigator.userAgentData.platform === "macOS" : /Mac/.test(navigator.platform);
+  if (mac) {
+    document.getElementById("windows").classList.remove("primary");
+    document.getElementById("macos").classList.add("primary");
+    document.getElementById("downloads").prepend(document.getElementById("macos"));
+  }
+  fetch("updates.json").then(r => r.json()).then(manifest => {
+    const versions = Object.values(manifest.addons)[0].updates.map(u => u.version);
+    const newest = versions.sort((a, b) => a.localeCompare(b, undefined, { numeric: true })).pop();
+    document.getElementById("version").textContent = `Version ${newest} \u00b7 `;
+  }).catch(() => {});
+</script>
 </body>
 </html>

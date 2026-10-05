@@ -5,15 +5,15 @@
 The colours and outline follow the mascot artwork. Writes assets/fedora.svg and assets/fedora.png (512 px),
 and extension/icons/fedora-{16,32,64}.png (for light toolbars) and fedora-light-{16,32,64}.png (with a
 soft cream edge, for dark toolbars). The hat spans the icon's width and sits in the lower part of its
-height, leaving room above for the hop in background/toolbar.js.
+height, leaving room above for the hop in background/toolbar.js. The landing page's favicon
+(docs/favicon.svg, and docs/favicon.png at 64 px) is the same hat, centred.
 """
 
 from pathlib import Path
 
-import resvg_py
-
 REPO = Path(__file__).resolve().parents[1]
 ICONS = REPO / "extension" / "icons"
+DOCS = REPO / "docs"
 
 OUTLINE = "#1e0a08"
 FELT_LIGHT = "#9a5c37"
@@ -36,16 +36,17 @@ BRIM = ("M4.5 41.5 C8 39.6 12.5 41.2 17 43.6 C26 46.4 38 46.4 47 43.6 C51.5 41.2
 BRIM_LIGHT = "M8 43.2 C12 42.6 15.5 44.4 18.5 46.2 C26 48.6 38 48.6 45.5 46.2 C40 50.2 24 50.6 13.5 47.8 C10.8 46.6 9 45 8 43.2 Z"
 
 
-def svg(edge_width: float = 0) -> str:
+def svg(edge_width: float = 0, centred: bool = False) -> str:
     """The hat; edge_width > 0 adds the cream edge used on dark toolbars."""
     stroke = f'stroke="{OUTLINE}" stroke-width="3.2" stroke-linejoin="round" stroke-linecap="round"'
     under = ""
     if edge_width:
         cream = f'fill="{CREAM}" stroke="{CREAM}" stroke-width="{edge_width}" stroke-linejoin="round" opacity="0.62"'
         under = f'<g {cream}><path d="{CROWN}"/><path d="{BRIM}"/></g>'
-    # Stretched to reach the icon's edges, and resting low so it has room to hop.
+    # Stretched to reach the icon's edges, and resting low so it has room to hop (unless centred).
+    shift = -2 if centred else 3.5
     return f"""<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64">
-  <g transform="matrix(1.07 0 0 1 -2.24 3.5)">
+  <g transform="matrix(1.07 0 0 1 -2.24 {shift})">
   {under}
   <path d="{CROWN}" fill="{FELT}" {stroke}/>
   <path d="{CROWN_LIGHT}" fill="{FELT_LIGHT}"/>
@@ -63,6 +64,8 @@ def svg(edge_width: float = 0) -> str:
 
 
 def render(source: str, size: int, path: Path) -> None:
+    import resvg_py
+
     path.write_bytes(bytes(resvg_py.svg_to_bytes(svg_string=source, width=size, height=size)))
 
 
@@ -73,7 +76,10 @@ def main() -> None:
     for size in (16, 32, 64):
         render(plain, size, ICONS / f"fedora-{size}.png")
         render(svg(edge_width=5 if size == 16 else 7), size, ICONS / f"fedora-light-{size}.png")
-    print(f"icons in {ICONS}")
+    favicon = svg(centred=True)
+    (DOCS / "favicon.svg").write_text(favicon, encoding="utf-8")
+    render(favicon, 64, DOCS / "favicon.png")
+    print(f"icons in {ICONS}, favicon in {DOCS}")
 
 
 if __name__ == "__main__":
