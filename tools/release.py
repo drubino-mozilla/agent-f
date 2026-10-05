@@ -4,7 +4,8 @@
 
 Needs an addons.mozilla.org API key (see sign_xpi.py) and the GitHub CLI signed in with push access.
 Firefox installs with Agent F check docs/updates.json, served by GitHub Pages at the manifest's
-update_url, and update themselves.
+update_url, and update themselves. Publishing the release starts the Installers workflow, which builds the
+Windows and macOS installers from the tagged commit around the signed add-on, tests them, and attaches them.
 """
 
 import hashlib
@@ -43,9 +44,13 @@ def main() -> None:
     sha256 = hashlib.sha256(asset.read_bytes()).hexdigest()
     link = f"https://github.com/{GITHUB_REPO}/releases/download/{tag}/{asset.name}"
 
-    notes = f"Signed Agent F add-on {version}. Install it in Firefox, or run the installer from a clone of this repo."
+    # The installers are built from the tagged commit, so it has to be on GitHub before the tag is.
+    run("git", "push")
+    notes = (f"Agent F {version}. To install or update, run `Agent-F-Windows.exe` or `Agent-F-macOS.pkg`; they "
+             f"are attached a few minutes after the release is published. `{asset.name}` is the signed Firefox "
+             "add-on on its own.")
     run("gh", "release", "create", tag, str(asset), "--repo", GITHUB_REPO, "--title", f"Agent F {version}",
-        "--notes", notes)
+        "--target", run("git", "rev-parse", "HEAD"), "--notes", notes)
 
     updates = json.loads(UPDATES.read_text(encoding="utf-8")) if UPDATES.exists() else {"addons": {}}
     entries = updates.setdefault("addons", {}).setdefault(addon_id, {}).setdefault("updates", [])
@@ -62,6 +67,7 @@ def main() -> None:
     run("git", "commit", "-m", f"Update manifest for {version}")
     run("git", "push")
     print(f"Released {tag}: {link}")
+    print(f"The installers follow from the Installers workflow: https://github.com/{GITHUB_REPO}/actions")
 
 
 if __name__ == "__main__":

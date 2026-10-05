@@ -1,0 +1,12 @@
+#!/bin/sh
+# Agent F package: clear out the previous version, so files a newer version dropped don't linger.
+# The running broker keeps going from the deleted files until postinstall replaces it.
+
+if [ "$(id -u)" = 0 ]; then
+  user=$(stat -f%Su /dev/console)
+  exec launchctl asuser "$(id -u "$user")" sudo -u "$user" -H "$0" "$@"
+fi
+
+home=$(eval echo "~$(id -un)")
+rm -rf "$home/Library/Application Support/agent-f/app"
+exit 0

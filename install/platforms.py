@@ -11,6 +11,8 @@ from pathlib import Path
 
 HOME = Path.home()
 LAUNCH_AGENT = "io.github.drubino-mozilla.agent-f"
+PKG_ID = "io.github.drubino-mozilla.agent-f"
+PAUSE_MARKER = "paused"
 SYSTEMD_UNIT = "agent-f-broker.service"
 
 
@@ -19,6 +21,14 @@ class Platform:
 
     def venv_python(self, venv: Path, windowed: bool = False) -> Path:
         return venv / "bin" / "python"
+
+    def bundled_python(self, windowed: bool = False) -> Path:
+        """The packaged installers' runtime: the Python running this script."""
+        return Path(sys.executable)
+
+    def remove_bundle(self, app_dir: Path) -> list[Path]:
+        """Delete what a packaged installer put down, where its uninstaller doesn't do it itself."""
+        return []
 
     def write_launcher(self, native_dir: Path, python: Path, host_script: Path) -> Path:
         launcher = native_dir / "agent_f_host.sh"
@@ -70,6 +80,9 @@ class Platform:
         subprocess.Popen(command, stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
                          close_fds=True, start_new_session=True)
 
+    def start_broker(self, command: list[str]) -> None:
+        self.start_detached(command)
+
     def reserved_port_ranges(self) -> list[tuple[int, int]]:
         """Port ranges the installer must not pick: reserved ranges and the OS's ephemeral range."""
         return [(49152, 65535)]
@@ -87,9 +100,15 @@ class Windows(Platform):
     def venv_python(self, venv: Path, windowed: bool = False) -> Path:
         return venv / "Scripts" / ("pythonw.exe" if windowed else "python.exe")
 
+    def bundled_python(self, windowed: bool = False) -> Path:
+        return Path(sys.executable).with_name("pythonw.exe" if windowed else "python.exe")
+
     def write_launcher(self, native_dir: Path, python: Path, host_script: Path) -> Path:
+        # The Windows installer creates PAUSE_MARKER while it replaces files, so that no helper
+        # Firefox starts meanwhile locks the runtime it is replacing.
         launcher = native_dir / "agent_f_host.bat"
-        launcher.write_text(f'@echo off\r\n"{python}" "{host_script}" %*\r\n', encoding="utf-8")
+        launcher.write_text(f'@echo off\r\nif exist "%~dp0{PAUSE_MARKER}" exit /b 1\r\n'
+                            f'"{python}" "{host_script}" %*\r\n', encoding="utf-8", newline="")
         return launcher
 
     @staticmethod
@@ -184,8 +203,18 @@ class MacOS(Platform):
         path = self._plist()
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_bytes(self.launch_agent(command))
-        # Loaded at the next login; the installer starts this session's broker itself.
         return f"broker starts at login ({path})"
+
+    def start_broker(self, command: list[str]) -> None:
+        # Through launchd when possible: a process started from an Installer package script doesn't
+        # outlive the script, and launchd also loads the new command for this session.
+        domain = f"gui/{os.getuid()}"
+        if self._plist().exists():
+            subprocess.run(["launchctl", "bootout", f"{domain}/{LAUNCH_AGENT}"], capture_output=True, check=False)
+            if subprocess.run(["launchctl", "bootstrap", domain, str(self._plist())],
+                              capture_output=True, check=False).returncode == 0:
+                return
+        self.start_detached(command)
 
     def remove_autostart(self) -> bool:
         path = self._plist()
@@ -194,6 +223,16 @@ class MacOS(Platform):
         subprocess.run(["launchctl", "bootout", f"gui/{os.getuid()}", str(path)], capture_output=True, check=False)
         path.unlink()
         return True
+
+    def remove_bundle(self, app_dir: Path) -> list[Path]:
+        removed = []
+        for path in (app_dir, HOME / "Applications" / "Uninstall Agent F.app"):
+            if path.exists():
+                shutil.rmtree(path, ignore_errors=True)
+                removed.append(path)
+        for args in (["--volume", str(HOME)], []):
+            subprocess.run(["pkgutil", *args, "--forget", PKG_ID], capture_output=True, check=False)
+        return removed
 
     def firefox_roots(self) -> list[Path]:
         return [HOME / "Library" / "Application Support" / "Firefox"]

@@ -429,7 +429,18 @@ The Cursor configuration entry it writes:
 {"agent-f": {"url": "http://127.0.0.1:47470/mcp", "headers": {"Authorization": "Bearer <token>"}}}
 ```
 
-`install.py --uninstall` reverses every step except the add-on, which is removed in `about:addons`. The signed add-on updates itself: its `update_url` is `https://drubino-mozilla.github.io/agent-f/updates.json`, which GitHub Pages serves from `docs/updates.json`, and each entry points at a GitHub release asset with its SHA-256. Re-running the installer (after `git pull`) updates the broker.
+`install.py --uninstall` reverses every step except the add-on, which is removed in `about:addons`. It unregisters the helper and blanks the broker command before it stops the broker, because a helper that Firefox starts in the meantime would otherwise start the broker again. `--addon` leaves a profile alone if it already has the add-on: an installed copy updates itself, and replacing its file could downgrade it.
+
+### Packaged installers
+
+Colleagues and the public get traditional installers instead, attached to every GitHub release and offered on the landing page: `Agent-F-Windows.exe` (Inno Setup) and `Agent-F-macOS.pkg`. Both install for the current user only, need no administrator rights, update an existing install in place when run again, and keep the data folder. Each carries its own Python, the broker with its dependencies already installed, the helper, the signed add-on, and a copy of `install.py` with a `bundle.json` beside it. With `bundle.json` present, `install.py` uses the Python it runs on instead of building a venv, takes the add-on from the bundle, and logs to `logs/install.log`. The installers copy their files and then run it with `--addon`, so both kinds of install do the same setup.
+
+- Windows. The files go to `%LOCALAPPDATA%\Programs\Agent F`, with Python's embeddable distribution (signed by the Python Software Foundation) as the runtime. Agent F appears in Settings > Apps, whose uninstaller runs `install.py --uninstall` and asks whether to delete the data folder too. A running helper locks the runtime's files, so an update first creates a `paused` file in `native\`, stops every process running from the install folder, and replaces the files. The helper's launcher exits at once while `paused` exists, and `install.py` deletes it once the new files are in place. The add-on retries the helper with a growing delay, so it reconnects within about 30 seconds.
+- macOS. A home-folder package (`enable_currentUserHome`) installs to `~/Library/Application Support/agent-f/app`, with python-build-standalone runtimes for Apple silicon and Intel. Its postinstall script keeps the one for this Mac and runs `install.py`, which starts the broker through `launchctl bootstrap`: a process an Installer script starts doesn't outlive the script. It also compiles `~/Applications/Uninstall Agent F.app` from `packaging/macos/uninstall.applescript`, which asks for confirmation and runs `install.py --uninstall`. In bundled mode on macOS, that also deletes the app folder, the uninstaller and the package receipt.
+
+The Installers workflow (`.github/workflows/installers.yml`) builds both when a release is published, with `tools/build_installer.py` on a Windows and a Mac runner. The runtimes are pinned by URL and SHA-256 in `packaging/runtimes.json`, and the dependencies are pinned with hashes for each runtime in `packaging/requirements-windows.txt`, `-macos-arm64.txt` and `-macos-x86_64.txt` (the two Macs can need different versions: `cryptography` stopped publishing Intel Mac wheels after 48.0.1, so the Intel runtime stays on that release). `tools/lock_bundle.py` writes those locks from pip's resolver without installing anything, and skips any release younger than seven days. `packaging/smoke_test.py` then runs each installer on the runner. It checks the broker, the helper registration, the add-on in a default profile and the Cursor entry. It waits for a headless Firefox to connect through the helper, runs the installer again while that Firefox stays connected, and waits for it to reconnect. Finally it uninstalls and checks that nothing is left. Only then are the installers attached to the release.
+
+Neither installer is code-signed yet, so Windows SmartScreen and macOS Gatekeeper warn on first open; the landing page says how to proceed. Signing needs a Windows code-signing certificate and an Apple Developer ID with notarization, and both slot into the workflow as secrets. The signed add-on updates itself: its `update_url` is `https://drubino-mozilla.github.io/agent-f/updates.json`, which GitHub Pages serves from `docs/updates.json`, and each entry points at a GitHub release asset with its SHA-256. Re-running the installer (after `git pull`) updates the broker.
 
 A release is one command, `tools/release.py`, run from a clean tree after bumping the version in `extension/manifest.json`:
 1. `tools/build_xpi.py` zips `extension/` into `dist/`, with fixed timestamps.
@@ -446,7 +457,7 @@ The author's Nightly runs the extension the same way, from a link file, so it is
 
 ## 14. Platforms, signing and licence
 
-- Windows 11 is supported from M0 and is where Agent F is tested. macOS and Linux support arrived in M4, in `install/platforms.py`: native-host registration, autostart, process control, reserved ports and where Firefox keeps its profiles. It is covered by unit tests but hasn't yet run on a Mac or a Linux machine. Snap and Flatpak builds of Firefox on Linux restrict native messaging and may not reach the helper.
+- Windows 11 is supported from M0 and is where Agent F is tested. macOS and Linux support arrived in M4, in `install/platforms.py`: native-host registration, autostart, process control, reserved ports and where Firefox keeps its profiles. It is covered by unit tests, and since M5 the macOS package is installed, connected to Firefox, updated and uninstalled on GitHub's Mac runners for every release, but nobody has run it on their own Mac yet, nor the installer on Linux. Snap and Flatpak builds of Firefox on Linux restrict native messaging and may not reach the helper.
 - Firefox 140 or later on any channel. The extension uses only standard APIs, so addons.mozilla.org can sign it as an unlisted, self-distributed add-on. It then installs anywhere with no pref changes. `tools/sign_xpi.py` calls the addons.mozilla.org signing API with the author's API credentials (see Q6).
 - The add-on's display name avoids "Firefox", which addons.mozilla.org doesn't allow in add-on names.
 - Licence: MPL-2.0, Mozilla's default.
@@ -482,13 +493,22 @@ agent-f/
     platforms.py       what differs on Windows, macOS and Linux
     Install Agent F.cmd       double-click launcher, Windows
     Install Agent F.command   double-click launcher, macOS (also runs on Linux)
+  packaging/
+    runtimes.json      the pinned Python runtimes
+    requirements-*.txt the broker's locked dependencies, per platform
+    windows/           the Inno Setup script
+    macos/             distribution, install scripts, uninstaller, installer pages
+    smoke_test.py      the CI test of a built installer
+  .github/workflows/installers.yml   builds, tests and attaches the installers
   tools/
     dev_profile.py     throwaway profiles that run the extension from this clone; restart reloads it
     mcp_call.py        runs a sequence of tool calls through the broker, for testing
     build_xpi.py       packages extension/ into dist/
     sign_xpi.py        signs a package as an unlisted add-on on addons.mozilla.org
     release.py         build, sign, GitHub release, update manifest
-  docs/                GitHub Pages: updates.json, the add-on's update manifest
+    build_installer.py builds the Windows or macOS installer
+    lock_bundle.py     writes packaging/requirements-*.txt
+  docs/                GitHub Pages: the landing page, and updates.json, the add-on's update manifest
   testpages/           local fixtures served by the test harness
 ```
 
@@ -576,6 +596,10 @@ Each milestone ends with its acceptance tests passing on Windows.
   - addons.mozilla.org signing and self-hosted updates (0.4.0 signed and released; the update manifest lists it);
   - macOS and Linux installers (built and unit-tested, not yet run on either);
   - a README for colleagues.
+- M5, traditional installers (built 2026-10-04; tested end to end on GitHub's Windows and Mac runners, not yet on anyone's own Mac):
+  - `Agent-F-Windows.exe` and `Agent-F-macOS.pkg`, each with its own Python, that install, update and uninstall (section 13);
+  - the Installers workflow, which builds and tests them and attaches them to every release;
+  - download buttons on the landing page.
 
 ## 19. Open questions
 

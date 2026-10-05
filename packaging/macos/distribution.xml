@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- The Agent F package. tools/build_installer.py fills in @VERSION@ and @PKG_ID@. It installs into the
+     user's home folder only, like the Windows installer, so it needs no administrator password. -->
+<installer-gui-script minSpecVersion="2">
+  <title>Agent F</title>
+  <welcome file="welcome.html" mime-type="text/html"/>
+  <conclusion file="conclusion.html" mime-type="text/html"/>
+  <domains enable_anywhere="false" enable_currentUserHome="true" enable_localSystem="false"/>
+  <options customize="never" require-scripts="false" hostArchitectures="arm64,x86_64"/>
+  <allowed-os-versions>
+    <os-version min="11.0"/>
+  </allowed-os-versions>
+  <choices-outline>
+    <line choice="agent-f"/>
+  </choices-outline>
+  <choice id="agent-f" title="Agent F" visible="false">
+    <pkg-ref id="@PKG_ID@"/>
+  </choice>
+  <pkg-ref id="@PKG_ID@" version="@VERSION@" onConclusion="none">agent-f-component.pkg</pkg-ref>
+</installer-gui-script>

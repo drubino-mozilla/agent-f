@@ -1,0 +1,33 @@
+#!/bin/sh
+# Agent F package: keep the runtime for this Mac's processor, run install/install.py with it, and put
+# "Uninstall Agent F" in ~/Applications. A home-folder install runs this as the user; if an install ever
+# runs it as root, it hands over to the user at the console, whose home folder Agent F lives in.
+
+if [ "$(id -u)" = 0 ]; then
+  user=$(stat -f%Su /dev/console)
+  exec launchctl asuser "$(id -u "$user")" sudo -u "$user" -H "$0" "$@"
+fi
+
+home=$(eval echo "~$(id -un)")
+app="$home/Library/Application Support/agent-f/app"
+
+if [ "$(sysctl -n hw.optional.arm64 2>/dev/null)" = 1 ]; then
+  arch=arm64 other=x86_64
+else
+  arch=x86_64 other=arm64
+fi
+rm -rf "$app/runtime-$other" "$app/runtime"
+mv "$app/runtime-$arch" "$app/runtime"
+
+HOME="$home" "$app/runtime/bin/python3" "$app/install/install.py" --addon
+status=$?
+
+uninstaller="$home/Applications/Uninstall Agent F.app"
+mkdir -p "$home/Applications"
+rm -rf "$uninstaller"
+if osacompile -o "$uninstaller" "$app/uninstall.applescript"; then
+  cp "$app/agent-f.icns" "$uninstaller/Contents/Resources/applet.icns"
+  codesign --force --sign - "$uninstaller" 2>/dev/null
+fi
+
+exit $status

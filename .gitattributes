@@ -1,0 +1,4 @@
+packaging/macos/scripts/* text eol=lf
+*.applescript text eol=lf
+*.sh text eol=lf
+*.command text eol=lf

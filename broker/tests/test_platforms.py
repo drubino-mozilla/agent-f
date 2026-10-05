@@ -51,6 +51,14 @@ def test_posix_launcher_quotes_paths(tmp_path):
     assert "exec '/a b/python' /c/agent_f_host.py \"$@\"" in text
 
 
+def test_windows_launcher_waits_out_an_install(tmp_path):
+    launcher = platforms.Windows().write_launcher(tmp_path, Path("C:/A/runtime/python.exe"),
+                                                  Path("C:/D/agent_f_host.py"))
+    lines = launcher.read_bytes().decode("utf-8").split("\r\n")
+    assert lines[1] == f'if exist "%~dp0{platforms.PAUSE_MARKER}" exit /b 1'
+    assert lines[2] == f'"{Path("C:/A/runtime/python.exe")}" "{Path("C:/D/agent_f_host.py")}" %*'
+
+
 def test_launch_agent_plist():
     data = plistlib.loads(platforms.MacOS().launch_agent(COMMAND))
     assert data["Label"] == platforms.LAUNCH_AGENT
@@ -108,3 +116,45 @@ def test_install_addon_skips_source_linked_profiles(firefox_root, monkeypatch, t
 def test_install_addon_rejects_unknown_profile(firefox_root):
     with pytest.raises(SystemExit, match="nope"):
         install.install_addon(["nope"])
+
+
+def test_install_addon_keeps_an_installed_copy(firefox_root, monkeypatch, tmp_path):
+    installed = firefox_root / "Profiles/xyz.default-nightly/extensions"
+    installed.mkdir(parents=True)
+    (installed / f"{install.ADDON_ID}.xpi").write_bytes(b"newer, from an update")
+
+    def no_download():
+        raise AssertionError("nothing to download")
+
+    monkeypatch.setattr(install, "download_signed_addon", no_download)
+    install.install_addon([])
+    assert (installed / f"{install.ADDON_ID}.xpi").read_bytes() == b"newer, from an update"
+
+
+def test_install_addon_uses_the_bundled_copy(firefox_root, monkeypatch, tmp_path):
+    xpi = tmp_path / "bundled.xpi"
+    xpi.write_bytes(b"bundled")
+    monkeypatch.setattr(install, "download_signed_addon", lambda: pytest.fail("should use the bundled add-on"))
+    install.install_addon([], xpi)
+    target = firefox_root / "Profiles/xyz.default-nightly/extensions" / f"{install.ADDON_ID}.xpi"
+    assert target.read_bytes() == b"bundled"
+
+
+def test_bundled_python_on_windows(monkeypatch):
+    monkeypatch.setattr(sys, "executable", str(Path("C:/A/0.5.0/runtime/python.exe")))
+    assert platforms.Windows().bundled_python(windowed=True) == Path("C:/A/0.5.0/runtime/pythonw.exe")
+    assert platforms.Windows().bundled_python() == Path("C:/A/0.5.0/runtime/python.exe")
+
+
+def test_uninstall_blanks_the_broker_command_before_stopping(monkeypatch, tmp_path):
+    monkeypatch.setenv("AGENT_F_HOME", str(tmp_path))
+    install.save_config(install.Config(broker_command=["python", "-m", "agent_f.broker"]))
+    order = []
+    monkeypatch.setattr(install.OS, "unregister_native_host", lambda name: order.append("unregister") or True)
+    monkeypatch.setattr(install.OS, "remove_autostart", lambda: order.append("autostart") or True)
+    monkeypatch.setattr(install, "stop_broker",
+                        lambda: order.append(("stop", install.load_config().broker_command)))
+    monkeypatch.setattr(install, "remove_cursor_config", lambda: None)
+    monkeypatch.setattr(install, "BUNDLE", None)
+    install.uninstall(type("Args", (), {"purge": False})())
+    assert order == ["unregister", "autostart", ("stop", [])]

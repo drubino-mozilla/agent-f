@@ -1,0 +1,116 @@
+# Builds and tests the Windows and macOS installers, and attaches them to the GitHub release.
+# Runs by itself when tools/release.py publishes a release. Run it by hand (Actions > Installers > Run workflow)
+# to rebuild for an existing release, or with "relock" to regenerate packaging/requirements-*.txt, which the
+# run then offers as artifacts to commit.
+name: Installers
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Release to attach the installers to, such as v0.4.3 (leave empty to build and test only)
+        required: false
+      relock:
+        description: Regenerate the dependency locks
+        type: boolean
+        default: false
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows
+            runner: windows-latest
+            asset: Agent-F-Windows.exe
+          - os: macos
+            runner: macos-latest
+            asset: Agent-F-macOS.pkg
+    runs-on: ${{ matrix.runner }}
+    env:
+      GH_TOKEN: ${{ github.token }}
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+
+      - name: Lock the broker's dependencies
+        if: inputs.relock || hashFiles(format('packaging/requirements-{0}*.txt', matrix.os)) == ''
+        run: python tools/lock_bundle.py ${{ matrix.os }}
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: lock-${{ matrix.os }}
+          path: packaging/requirements-${{ matrix.os }}*.txt
+          if-no-files-found: ignore
+
+      - name: Get the signed add-on
+        run: |
+          version=$(python -c "import json; print(json.load(open('extension/manifest.json'))['version'])")
+          mkdir -p build/xpi
+          gh release download "v$version" --pattern "agent-f-$version.xpi" --dir build/xpi \
+            || gh release download --pattern "agent-f-*.xpi" --dir build/xpi
+          echo "XPI=$(ls build/xpi/*.xpi | head -n 1)" >> "$GITHUB_ENV"
+
+      - name: Install Inno Setup
+        if: matrix.os == 'windows'
+        shell: pwsh
+        run: if (-not (Test-Path "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe")) { choco install innosetup -y --no-progress }
+
+      - name: Build
+        run: python tools/build_installer.py ${{ matrix.os }} --xpi "$XPI"
+
+      - name: Test
+        run: python packaging/smoke_test.py ${{ matrix.os }} "dist/${{ matrix.asset }}"
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: installer-${{ matrix.os }}
+          path: |
+            dist/${{ matrix.asset }}
+            dist/*.log
+          if-no-files-found: ignore
+
+  # GitHub's standard Mac runners are Apple silicon, so the package's Intel runtime is tested here.
+  test-intel-mac:
+    needs: build
+    runs-on: macos-15-intel
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+      - uses: actions/download-artifact@v4
+        with:
+          name: installer-macos
+          path: dist
+      - name: Test
+        run: python packaging/smoke_test.py macos dist/Agent-F-macOS.pkg
+
+  publish:
+    needs: [build, test-intel-mac]
+    if: github.event.release.tag_name || inputs.tag
+    runs-on: ubuntu-latest
+    env:
+      TAG: ${{ github.event.release.tag_name || inputs.tag }}
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: installer-*
+          merge-multiple: true
+          path: dist
+      - name: Attach to the release
+        run: gh release upload "$TAG" dist/Agent-F-Windows.exe dist/Agent-F-macOS.pkg --clobber --repo "$GITHUB_REPOSITORY"
