@@ -94,18 +94,21 @@ def register(tool, kit: Toolkit) -> None:
 
     @tool()
     async def get_network(ctx: Context, url: str | None = None, method: str | None = None,
-                          status: str | None = None, after: int | None = None, limit: int = 50,
-                          bodies: bool = False, tab: int | None = None, browser: str | None = None,
-                          since: str | None = None) -> str:
+                          status: str | None = None, type: str | None = None, after: int | None = None,
+                          limit: int = 50, bodies: bool = False, headers: bool = False, tab: int | None = None,
+                          browser: str | None = None, since: str | None = None) -> str:
         """Requests recorded in a tab since set_capture turned network capture on.
 
         Args:
             url: Only requests whose address contains this text.
             method: Only this method, such as GET or POST.
             status: Only this status, such as 404, or a class such as 5xx.
+            type: Only this kind of request: xhr (XHR and fetch), document, script, stylesheet, image, font,
+                media, websocket or other.
             after: Only requests numbered after this, from a previous get_network.
             limit: Most recent requests to return.
             bodies: Include request and response bodies (text only; password-like fields are redacted).
+            headers: Include request and response headers (cookies and credentials are redacted).
             tab: Tab id. Defaults to your current tab.
             browser: Browser label. Needed only when several browsers are connected.
             since: The since token from the end of your previous Agent F result.
@@ -120,6 +123,11 @@ def register(tool, kit: Toolkit) -> None:
                 took = f" {q['duration']} ms" if q.get("duration") is not None else ""
                 kind = f" {q['contentType'].split(';')[0]}" if q.get("contentType") else ""
                 lines.append(f"#{q['seq']} {q['method']} {state} {q['type']}{took}{kind} {short_url(q['url'], 200)}")
+                if headers:
+                    for label, key in (("request headers", "requestHeaders"), ("response headers", "responseHeaders")):
+                        if q.get(key):
+                            lines.append(f"  {label}:")
+                            lines.extend(f"    {h['name']}: {h['value']}" for h in q[key])
                 if bodies:
                     if q.get("requestBody"):
                         lines.append(f"  request body: {q['requestBody'][:2000]}")
@@ -130,8 +138,8 @@ def register(tool, kit: Toolkit) -> None:
             return (head + "\n" + envelope.page_content("\n".join(lines))
                     + f"\nPass after={r.get('lastSeq')} next time to see only newer requests.")
         return await kit.run(ctx, since, browser=browser, tab=tab, command="get_network", render=render,
-                             params={"url": url, "method": method, "status": status, "since_seq": after,
-                                     "limit": limit, "bodies": bodies})
+                             params={"url": url, "method": method, "status": status, "type": type,
+                                     "since_seq": after, "limit": limit, "bodies": bodies, "headers": headers})
 
     @tool()
     async def get_console(ctx: Context, level: str | None = None, after: int | None = None, limit: int = 100,

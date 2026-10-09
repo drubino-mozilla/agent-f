@@ -13,6 +13,7 @@ from .bridge import BrowserConnection, BrowserError, Hub
 from .events import render_changes
 from .refs import looks_like_ref
 from .sessions import Session
+from .webdriver import UNREACHABLE_HINT, WebDriverError
 
 
 class AgentFError(Exception):
@@ -197,10 +198,13 @@ class Toolkit:
                   command: str, params: dict, render: Callable[[dict], str | tuple[str, list]],
                   ref: str | None = None, selector: str | None = None, timeout: float = 30,
                   default_to_user_tab: bool = True,
-                  prepare: Callable[[Target, Call], Awaitable[dict]] | None = None):
+                  prepare: Callable[[Target, Call], Awaitable[dict]] | None = None,
+                  perform: Callable[[Call, Target, dict], Awaitable[tuple[dict, str, list[str]]]] | None = None):
         """Resolve the target, call the browser, and render the result, including stale-ref recovery.
 
         prepare, if given, runs after the target is known and returns extra command parameters.
+        perform, if given, replaces the single browser command: it gets the call, the target and the
+        full parameters, and returns what call() does.
         """
         session = self.session_for(ctx, since)
         target = None
@@ -210,17 +214,22 @@ class Toolkit:
             cached = target.conn.tabs.get(target.tab)
             header = self.header_for(target.conn, {"id": target.tab, **cached}, target.note)
             extra = await prepare(target, session) if prepare else {}
-            result, header, effects = await self.call(
-                session, target, command, {**params, **extra, **target.params(selector)}, timeout)
+            full = {**params, **extra, **target.params(selector)}
+            if perform:
+                result, header, effects = await perform(session, target, full)
+            else:
+                result, header, effects = await self.call(session, target, command, full, timeout)
             rendered = render(result)
             extras = []
             if isinstance(rendered, tuple):
                 rendered, extras = rendered
             text = self.finish(session, rendered, header=header, effects=effects)
             return [text, *extras] if extras else text
-        except AgentFError as err:
+        except (AgentFError, WebDriverError) as err:
             raise self.fail(session, err, header)
         except BrowserError as err:
+            if err.code == "unreachable_page" and UNREACHABLE_HINT not in err.message:
+                err.message += UNREACHABLE_HINT
             if target is not None:
                 err.message = self.hub.refs.translate(target.conn.profile_id, target.tab, err.message)
             if target is not None and err.code in ("stale_document", "node_gone"):
@@ -264,7 +273,7 @@ class Toolkit:
                 header = self.header_for(conn, tab, None)
             body, _ = render(result, conn)
             return self.finish(session, body, header=header, effects=effects)
-        except (AgentFError, BrowserError) as err:
+        except (AgentFError, BrowserError, WebDriverError) as err:
             raise self.fail(session, err, header)
 
 

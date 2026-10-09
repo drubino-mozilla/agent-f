@@ -47,6 +47,29 @@ function redactText(text) {
     .replace(/((?:^|&)[^=&]*(?:pass(?:word|wd)?|pwd|secret|token|otp)[^=&]*=)[^&]*/gi, "$1redacted");
 }
 
+const SECRET_HEADERS = /^(cookie|set-cookie|authorization|proxy-authorization)$|token|secret|session|csrf|xsrf|api-?key|auth/i;
+
+function redactHeaders(headers) {
+  return (headers || []).slice(0, 60).map(h => ({
+    name: h.name,
+    value: SECRET_HEADERS.test(h.name) ? "redacted" : String(h.value ?? "").slice(0, 500),
+  }));
+}
+
+// webRequest types, plus the names developers tend to use for them.
+const TYPE_ALIASES = {
+  xhr: ["xmlhttprequest"], fetch: ["xmlhttprequest"], document: ["main_frame", "sub_frame"],
+  frame: ["sub_frame"], iframe: ["sub_frame"], css: ["stylesheet"], js: ["script"], img: ["image", "imageset"],
+};
+
+function typeMatches(type, want) {
+  if (!want) {
+    return true;
+  }
+  const w = String(want).toLowerCase();
+  return (TYPE_ALIASES[w] || [w]).includes(type);
+}
+
 function requestBodyText(requestBody, limit) {
   if (!requestBody) {
     return null;
@@ -135,6 +158,14 @@ function onBeforeRequest(d) {
   return {};
 }
 
+function onSendHeaders(d) {
+  const state = captures.get(d.tabId);
+  const entry = state && state.pending.get(d.requestId);
+  if (entry) {
+    entry.requestHeaders = redactHeaders(d.requestHeaders);
+  }
+}
+
 function onCompleted(d) {
   const state = captures.get(d.tabId);
   const entry = state && state.pending.get(d.requestId);
@@ -145,6 +176,7 @@ function onCompleted(d) {
   entry.status = d.statusCode;
   entry.duration = Math.round(d.timeStamp - entry.started);
   entry.fromCache = d.fromCache;
+  entry.responseHeaders = redactHeaders(d.responseHeaders);
   const type = (d.responseHeaders || []).find(h => h.name.toLowerCase() === "content-type");
   entry.contentType = type ? type.value : "";
 }
@@ -167,11 +199,13 @@ function updateNetworkListeners() {
   const filter = { urls: ["<all_urls>"] };
   if (wanted && !networkListening) {
     browser.webRequest.onBeforeRequest.addListener(onBeforeRequest, filter, ["blocking", "requestBody"]);
+    browser.webRequest.onSendHeaders.addListener(onSendHeaders, filter, ["requestHeaders"]);
     browser.webRequest.onCompleted.addListener(onCompleted, filter, ["responseHeaders"]);
     browser.webRequest.onErrorOccurred.addListener(onErrorOccurred, filter);
     networkListening = true;
   } else if (!wanted && networkListening) {
     browser.webRequest.onBeforeRequest.removeListener(onBeforeRequest);
+    browser.webRequest.onSendHeaders.removeListener(onSendHeaders);
     browser.webRequest.onCompleted.removeListener(onCompleted);
     browser.webRequest.onErrorOccurred.removeListener(onErrorOccurred);
     networkListening = false;
@@ -269,6 +303,7 @@ async function getNetworkCommand(p) {
       e.seq > since &&
       (!wantMethod || e.method === wantMethod) &&
       (!wantUrl || e.url.toLowerCase().includes(wantUrl)) &&
+      typeMatches(e.type, p.type) &&
       statusMatches(e.status, p.status)
   );
   const limit = p.limit || 50;
@@ -289,6 +324,10 @@ async function getNetworkCommand(p) {
     if (p.bodies) {
       out.requestBody = e.requestBody;
       out.responseBody = bodyText(e, perBody);
+    }
+    if (p.headers) {
+      out.requestHeaders = e.requestHeaders || [];
+      out.responseHeaders = e.responseHeaders || [];
     }
     return out;
   });

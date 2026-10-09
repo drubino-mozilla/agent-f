@@ -10,9 +10,11 @@ from mcp.server.fastmcp.utilities.types import Image
 from . import envelope
 from .bridge import BrowserError
 from .events import quote, short_url
-from . import tools_extra
+from . import tools_extra, tools_webdriver
 from .audit import Audit, audited
 from .toolkit import AgentFError, Toolkit, split_root
+from .tools_webdriver import eval_fallback, read_fallback, screenshot_fallback, unreachable_fallback
+from .tools_webdriver import trusted as trusted_input
 
 LABEL_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]{0,39}$")
 
@@ -32,6 +34,7 @@ def register(mcp: FastMCP, kit: Toolkit, audit: Audit | None = None) -> None:
     hub = kit.hub
     tool = audited(mcp, audit)
     tools_extra.register(tool, kit)
+    tools_webdriver.register(tool, kit)
 
     # Browsers.
 
@@ -271,8 +274,13 @@ def register(mcp: FastMCP, kit: Toolkit, audit: Audit | None = None) -> None:
         def render(result):
             text = result.get("text") or "(nothing interactive here)"
             body = envelope.page_content(text)
-            if result.get("truncated"):
-                body += "\n(The outline was cut to fit; pass a smaller root or a larger max_chars.)"
+            total, shown = result.get("total") or 0, result.get("shown") or 0
+            if result.get("truncated") or total > shown:
+                size = ""
+                if total > shown > 0:
+                    more = ", and the page has more than Agent F counted" if result.get("incomplete") else ""
+                    size = f" It shows about {max(1, round(100 * shown / total))}% of the full outline{more}."
+                body += f"\n(The outline was cut to fit.{size} Pass a section's ref as root, or a larger max_chars.)"
             return body
         return await kit.run(ctx, since, browser=browser, tab=tab, ref=ref, selector=selector, command="snapshot",
                              render=render, params={"mode": mode, "viewport_only": viewport_only, "max_chars": max_chars})
@@ -326,7 +334,8 @@ def register(mcp: FastMCP, kit: Toolkit, audit: Audit | None = None) -> None:
                 body += f"\n(Showing {shown} of {total} characters; pass a larger max_chars for more.)"
             return body
         return await kit.run(ctx, since, browser=browser, tab=tab, command="read_page", render=render, params={
-            "viewport_only": viewport_only, "max_chars": max_chars, "plain": plain})
+            "viewport_only": viewport_only, "max_chars": max_chars, "plain": plain},
+            perform=unreachable_fallback(kit, "read_page", read_fallback))
 
     @tool()
     async def find_in_page(ctx: Context, text: str, case_sensitive: bool = False, highlight: bool = False,
@@ -378,7 +387,8 @@ def register(mcp: FastMCP, kit: Toolkit, audit: Audit | None = None) -> None:
             return body, [image]
         return await kit.run(ctx, since, browser=browser, tab=tab, ref=ref, selector=selector, command="screenshot",
                              render=render, timeout=40, params={
-                                 "full_page": full_page, "marks": marks, "format": format, "max_width": max_width})
+                                 "full_page": full_page, "marks": marks, "format": format, "max_width": max_width},
+                             perform=unreachable_fallback(kit, "screenshot", screenshot_fallback))
 
     @tool()
     async def get_html(ctx: Context, tab: int | None = None, ref: str | None = None, selector: str | None = None,
@@ -412,7 +422,7 @@ def register(mcp: FastMCP, kit: Toolkit, audit: Audit | None = None) -> None:
     @tool()
     async def click(ctx: Context, ref: str | None = None, selector: str | None = None, button: str = "left",
                     count: int = 1, modifiers: list[str] | None = None, x: float | None = None, y: float | None = None,
-                    settle_ms: int = 3000, tab: int | None = None, browser: str | None = None,
+                    trusted: bool = False, settle_ms: int = 3000, tab: int | None = None, browser: str | None = None,
                     since: str | None = None) -> str:
         """Click an element. Reports what happened: navigation, new tabs, dialogs, focus.
 
@@ -424,6 +434,9 @@ def register(mcp: FastMCP, kit: Toolkit, audit: Audit | None = None) -> None:
             modifiers: Keys held down, such as ["Control"] or ["Shift"].
             x: Horizontal offset inside the element, in pixels. Defaults to its centre.
             y: Vertical offset inside the element, in pixels. Defaults to its centre.
+            trusted: Send a real click through Firefox's WebDriver server, still in the background. The page sees
+                a trusted click and a user gesture, for sites that ignore simulated clicks and for popups,
+                clipboard and file pickers. Needs Firefox's remote control on.
             settle_ms: Longest time to wait for the page to settle afterwards.
             tab: Tab id. Not needed with ref.
             browser: Browser label. Needed only when several browsers are connected.
@@ -432,12 +445,14 @@ def register(mcp: FastMCP, kit: Toolkit, audit: Audit | None = None) -> None:
         return await kit.run(ctx, since, browser=browser, tab=tab, ref=ref, selector=selector, command="click",
                              render=lambda r: f"Clicked {r.get('target')}.", timeout=action_timeout(settle_ms), params={
                                  "button": button, "count": count, "modifiers": modifiers or [], "x": x, "y": y,
-                                 "settle_ms": settle_ms})
+                                 "settle_ms": settle_ms},
+                             perform=trusted_input(kit, "click") if trusted else None)
 
     @tool(name="type")
     async def type_text(ctx: Context, text: str, ref: str | None = None, selector: str | None = None,
-                        clear: bool = True, submit: bool = False, method: str = "insert", settle_ms: int = 3000,
-                        tab: int | None = None, browser: str | None = None, since: str | None = None) -> str:
+                        clear: bool = True, submit: bool = False, method: str = "insert", trusted: bool = False,
+                        settle_ms: int = 3000, tab: int | None = None, browser: str | None = None,
+                        since: str | None = None) -> str:
         """Type text into a field or editable area.
 
         Args:
@@ -446,8 +461,12 @@ def register(mcp: FastMCP, kit: Toolkit, audit: Audit | None = None) -> None:
             selector: A CSS selector, used when there is no ref.
             clear: Replace what's there (default) rather than add to it.
             submit: Press Enter afterwards, submitting the form if there is one.
-            method: insert (default, like pasting) or keys (one key at a time, for fields that react per keystroke).
-                Hidden inputs that read keystrokes, as in Google Docs, get keys automatically.
+            method: insert (default, like pasting) or keys (one key at a time, sending keydown and keyup
+                around each character, for fields that react per keystroke: suggestions, formatting,
+                send on Enter). Hidden inputs that read keystrokes, as in Google Docs, get keys automatically.
+                Both send simulated key events; pages that check for real ones need trusted.
+            trusted: Type with real keystrokes through Firefox's WebDriver server, still in the background, so
+                the page gets trusted key events. Needs Firefox's remote control on.
             settle_ms: Longest time to wait for the page to settle afterwards.
             tab: Tab id. Not needed with ref.
             browser: Browser label. Needed only when several browsers are connected.
@@ -465,41 +484,53 @@ def register(mcp: FastMCP, kit: Toolkit, audit: Audit | None = None) -> None:
                 body += " Check the result with screenshot or read_page; the page may take a moment to show it."
             if r.get("submitted"):
                 body += f" Then {r['submitted']}."
+            elif trusted and submit:
+                body += " Then pressed Enter."
             return body
         return await kit.run(ctx, since, browser=browser, tab=tab, ref=ref, selector=selector, command="type",
                              render=render, timeout=action_timeout(settle_ms), params={
                                  "text": text, "clear": clear, "submit": submit, "method": method,
-                                 "settle_ms": settle_ms})
+                                 "settle_ms": settle_ms},
+                             perform=trusted_input(kit, "type") if trusted else None)
 
     @tool()
     async def press_key(ctx: Context, keys: str, ref: str | None = None, selector: str | None = None,
-                        settle_ms: int = 3000, tab: int | None = None, browser: str | None = None,
-                        since: str | None = None) -> str:
+                        trusted: bool = False, settle_ms: int = 3000, tab: int | None = None,
+                        browser: str | None = None, since: str | None = None) -> str:
         """Press keys, such as "Enter", "Escape", "Tab", "Control+a", or several separated by spaces.
 
         Args:
             keys: Keys or chords to press, separated by spaces.
             ref: Element to focus first. Defaults to whatever has focus in the page.
             selector: A CSS selector, used when there is no ref.
+            trusted: Press real keys through Firefox's WebDriver server, still in the background, so the page
+                gets trusted key events and the browser's own default actions. Needs Firefox's remote control on.
             settle_ms: Longest time to wait for the page to settle afterwards.
             tab: Tab id. Not needed with ref.
             browser: Browser label. Needed only when several browsers are connected.
             since: The since token from the end of your previous Agent F result.
         """
         def render(r):
-            return f"Pressed keys on {r.get('target')}:\n" + "\n".join(f"- {k}" for k in r.get("keys", []))
+            keys_done = r.get("keys") or [f"{k}: sent" for k in keys.split()]
+            return f"Pressed keys on {r.get('target')}:\n" + "\n".join(f"- {k}" for k in keys_done)
         return await kit.run(ctx, since, browser=browser, tab=tab, ref=ref, selector=selector, command="press_key",
                              render=render, timeout=action_timeout(settle_ms),
-                             params={"keys": keys, "settle_ms": settle_ms})
+                             params={"keys": keys, "settle_ms": settle_ms},
+                             perform=trusted_input(kit, "press_key") if trusted else None)
 
     @tool()
-    async def hover(ctx: Context, ref: str | None = None, selector: str | None = None, settle_ms: int = 1500,
-                    tab: int | None = None, browser: str | None = None, since: str | None = None) -> str:
-        """Move the pointer over an element, for menus and tooltips driven by script. CSS :hover styles don't apply.
+    async def hover(ctx: Context, ref: str | None = None, selector: str | None = None, trusted: bool = False,
+                    settle_ms: int = 1500, tab: int | None = None, browser: str | None = None,
+                    since: str | None = None) -> str:
+        """Move the pointer over an element, for menus and tooltips driven by script.
+
+        Simulated hovering doesn't apply CSS :hover styles; trusted does.
 
         Args:
             ref: An element ref from snapshot or find, such as e57.
             selector: A CSS selector, used when there is no ref.
+            trusted: Move the real WebDriver pointer through Firefox's WebDriver server, still in the background,
+                so :hover styles apply. Needs Firefox's remote control on.
             settle_ms: Longest time to wait for the page to settle afterwards.
             tab: Tab id. Not needed with ref.
             browser: Browser label. Needed only when several browsers are connected.
@@ -507,7 +538,8 @@ def register(mcp: FastMCP, kit: Toolkit, audit: Audit | None = None) -> None:
         """
         return await kit.run(ctx, since, browser=browser, tab=tab, ref=ref, selector=selector, command="hover",
                              render=lambda r: f"Hovered over {r.get('target')}.", timeout=action_timeout(settle_ms),
-                             params={"settle_ms": settle_ms})
+                             params={"settle_ms": settle_ms},
+                             perform=trusted_input(kit, "hover") if trusted else None)
 
     @tool()
     async def select_option(ctx: Context, values: list[str] | None = None, labels: list[str] | None = None,
@@ -525,6 +557,9 @@ def register(mcp: FastMCP, kit: Toolkit, audit: Audit | None = None) -> None:
             browser: Browser label. Needed only when several browsers are connected.
             since: The since token from the end of your previous Agent F result.
         """
+        if not values and not labels:
+            session = kit.session_for(ctx, since)
+            raise kit.fail(session, AgentFError("bad_arguments", "Pass values or labels: the options to choose."))
         return await kit.run(ctx, since, browser=browser, tab=tab, ref=ref, selector=selector, command="select_option",
                              render=lambda r: f"Selected {', '.join(quote(s, 60) for s in r.get('selected', []))} in {r.get('target')}.",
                              timeout=action_timeout(settle_ms),
@@ -594,11 +629,12 @@ def register(mcp: FastMCP, kit: Toolkit, audit: Audit | None = None) -> None:
         """Run JavaScript in the page, even on pages with strict security policies. Returns the result as JSON.
 
         The code runs in the extension's view of the page: document and the DOM work as usual, and `page` is the
-        page's own window, for its global variables and functions. Pass an expression, or statements that use
-        return; promises are awaited. Never use this to read password fields.
+        page's own window, for its global variables and functions. Pass an expression, or statements: the last
+        expression's value is returned, or use return. Promises are awaited. On pages extensions can't reach,
+        it runs through Firefox's WebDriver server if remote control is on. Never use this to read password fields.
 
         Args:
-            code: An expression, or statements with return.
+            code: An expression, or statements.
             frame: Frame id, for code in an iframe. Defaults to the top frame.
             timeout: Seconds to wait for the result.
             tab: Tab id. Defaults to your current tab.
@@ -612,7 +648,8 @@ def register(mcp: FastMCP, kit: Toolkit, audit: Audit | None = None) -> None:
                 body += f"\n(Showing {len(value)} of {total} characters.)"
             return body
         return await kit.run(ctx, since, browser=browser, tab=tab, command="eval_page", render=render,
-                             timeout=timeout + 10, params={"code": code, "frame": frame, "timeout": timeout})
+                             timeout=timeout + 10, params={"code": code, "frame": frame, "timeout": timeout},
+                             perform=unreachable_fallback(kit, "eval_page", eval_fallback))
 
 
 def _render_tab_list(result: dict, session, conn) -> str:

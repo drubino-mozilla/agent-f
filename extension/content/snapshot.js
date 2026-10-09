@@ -227,6 +227,9 @@ var AgentF = typeof AgentF !== "undefined" ? AgentF : {};
       const root = params.node != null || params.selector ? A.resolveTarget(params) : document;
       const budget = params.max_chars || 12000;
       const { nodes, truncated } = build(root, params);
+      const fullLines = [];
+      serialize(nodes, params.indent || 0, fullLines);
+      const total = fullLines.join("\n").length;
       applyBudget(nodes, budget);
       const lines = [];
       serialize(nodes, params.indent || 0, lines);
@@ -241,6 +244,10 @@ var AgentF = typeof AgentF !== "undefined" ? AgentF : {};
       return {
         text,
         truncated: truncated || cut,
+        shown: text.length,
+        total,
+        // The walk stopped at its element limit, so the page holds more than total measures.
+        incomplete: truncated,
         url: location.href,
         title: document.title,
         doc: A.DOC_ID,

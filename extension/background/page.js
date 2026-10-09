@@ -96,12 +96,8 @@ async function sendToFrame(tabId, frameId, command, params) {
   return tagFrame(reply.result, frameId);
 }
 
-// Runs one page action and reports what it caused: navigation, new tabs, dialogs, focus.
-async function runAction(p, command, params) {
-  const effects = [];
-  const tabId = p.tab;
-  const frameId = p.frame || 0;
-  await readyTab(tabId, effects);
+// Watches a tab for what an action causes: navigation and tabs it opens.
+async function beginTracking(tabId) {
   const before = await getTab(tabId);
   const nav = trackNavigation(tabId);
   const opened = [];
@@ -111,7 +107,25 @@ async function runAction(p, command, params) {
     }
   };
   browser.tabs.onCreated.addListener(onCreated);
-  const settleMs = p.settle_ms ?? 3000;
+  return {
+    before,
+    nav,
+    opened,
+    stop() {
+      nav.stop();
+      browser.tabs.onCreated.removeListener(onCreated);
+    },
+  };
+}
+
+// Runs one page action and reports what it caused: navigation, new tabs, dialogs, focus.
+async function runAction(p, command, params) {
+  const effects = [];
+  const tabId = p.tab;
+  const frameId = p.frame || 0;
+  await readyTab(tabId, effects);
+  const tracking = await beginTracking(tabId);
+  const { before, nav, opened } = tracking;
   let result = {};
   try {
     // If the action makes the page navigate, the old page may never send its reply,
@@ -137,6 +151,17 @@ async function runAction(p, command, params) {
         `The link opens in a new tab, so Agent F opened it in background tab ${tab.id}; the tab you clicked in stays where it was.`
       );
     }
+  } catch (e) {
+    tracking.stop();
+    throw e;
+  }
+  return finishAction(tabId, frameId, tracking, result, effects, p.settle_ms ?? 3000);
+}
+
+// Waits for an action's consequences to finish, then describes them.
+async function finishAction(tabId, frameId, tracking, result, effects, settleMs) {
+  const { before, nav, opened } = tracking;
+  try {
     await sleep(80);
     if (nav.started) {
       const done = await nav.wait(s => s.complete || s.closed, settleMs + 12000);
@@ -157,8 +182,7 @@ async function runAction(p, command, params) {
       }
     }
   } finally {
-    nav.stop();
-    browser.tabs.onCreated.removeListener(onCreated);
+    tracking.stop();
   }
   let after;
   try {
@@ -184,6 +208,88 @@ async function runAction(p, command, params) {
     result.target = "the element (the page navigated before it could reply)";
   }
   return { ...result, tab: after, effects };
+}
+
+// Trusted input comes in two halves around the broker's WebDriver step: trusted_begin readies the
+// element and starts watching, trusted_end settles and reports, as runAction does in one go.
+const trustedActions = new Map();
+
+async function trustedBeginCommand(p) {
+  const effects = [];
+  await readyTab(p.tab, effects);
+  const frameId = p.frame || 0;
+  const tracking = await beginTracking(p.tab);
+  let prepared;
+  try {
+    prepared = await sendToFrame(p.tab, frameId, "trusted_prepare", p);
+    if (frameId !== 0) {
+      // WebDriver points are relative to the tab's top viewport, and it finds tabs by their top document.
+      const top = await sendToFrame(p.tab, 0, "viewport_origin", {});
+      if (prepared.x !== null && prepared.x !== undefined) {
+        prepared.x += prepared.screenX - top.screenX;
+        prepared.y += prepared.screenY - top.screenY;
+      }
+      prepared.url = top.url;
+      prepared.timeOrigin = top.timeOrigin;
+    }
+  } catch (e) {
+    tracking.stop();
+    throw e;
+  }
+  const token = crypto.randomUUID();
+  const expire = setTimeout(() => {
+    tracking.stop();
+    trustedActions.delete(token);
+  }, 60000);
+  trustedActions.set(token, { tracking, expire, frameId, effects, settleMs: p.settle_ms ?? 3000 });
+  return {
+    token,
+    x: prepared.x,
+    y: prepared.y,
+    url: prepared.url,
+    timeOrigin: prepared.timeOrigin,
+    target: prepared.target,
+    tab: await tabInfo(p.tab),
+    effects: [],
+  };
+}
+
+async function trustedEndCommand(p) {
+  const state = trustedActions.get(p.token);
+  if (!state) {
+    throw new CommandError("trusted_expired", "Agent F stopped waiting for that input. Try again.");
+  }
+  trustedActions.delete(p.token);
+  clearTimeout(state.expire);
+  let result = {};
+  if (!state.tracking.nav.started) {
+    try {
+      result = (await sendToFrame(p.tab, state.frameId, "trusted_result", {})) || {};
+    } catch (e) {}
+  }
+  if (p.abort) {
+    state.tracking.stop();
+    return { aborted: true, tab: await tabInfo(p.tab), effects: [] };
+  }
+  result.target = p.target;
+  return finishAction(p.tab, state.frameId, state.tracking, result, state.effects, state.settleMs);
+}
+
+async function tabInfoCommand(p) {
+  const tab = await tabInfo(p.tab);
+  return { url: tab.url, tab, effects: [] };
+}
+
+// Identifies a page of this browser to WebDriver: the given tab, or the one the user has open.
+async function pageIdentityCommand(p) {
+  const tabId = p.tab ?? (await resolveTab({})).tab.id;
+  const tab = await getTab(tabId);
+  try {
+    const origin = await sendToFrame(tabId, 0, "viewport_origin", {});
+    return { url: origin.url, timeOrigin: origin.timeOrigin };
+  } catch (e) {
+    return { url: tab.url, timeOrigin: null };
+  }
 }
 
 async function inlineFrames(tabId, text, p, depth) {
@@ -387,22 +493,73 @@ const SERIALIZE = `function (value) {
   return out === undefined ? "undefined" : out;
 }`;
 
-function evalSource(code, asExpression) {
-  const body = asExpression ? `return (${code}\n);` : code;
+const STATEMENT_START = /^(?:return|if|for|while|do|switch|try|const|let|var|function|async\s+function|class|throw|break|continue|import|export|debugger)\b|^[{}]/;
+
+// Splits statements into everything before the last top-level statement and that statement, so
+// its value can be returned the way a console would. Strings, templates and comments are skipped;
+// returns null if the last statement doesn't look like an expression.
+function splitLastStatement(code) {
+  const src = code.replace(/[\s;]+$/, "");
+  let depth = 0;
+  let cut = -1;
+  for (let i = 0; i < src.length; i++) {
+    const c = src[i];
+    if (c === "/" && src[i + 1] === "/") {
+      const end = src.indexOf("\n", i);
+      i = end === -1 ? src.length : end - 1;
+    } else if (c === "/" && src[i + 1] === "*") {
+      const end = src.indexOf("*/", i + 2);
+      i = end === -1 ? src.length : end + 1;
+    } else if (c === '"' || c === "'" || c === "`") {
+      for (i++; i < src.length && src[i] !== c; i++) {
+        if (src[i] === "\\") {
+          i++;
+        }
+      }
+    } else if ("([{".includes(c)) {
+      depth++;
+    } else if (")]}".includes(c)) {
+      depth--;
+      if (depth === 0 && c === "}") {
+        cut = i;
+      }
+    } else if (depth === 0 && (c === ";" || c === "\n")) {
+      cut = i;
+    }
+  }
+  if (cut === -1) {
+    return null;
+  }
+  const head = src.slice(0, cut + 1);
+  const tail = src.slice(cut + 1).trim();
+  if (!tail || STATEMENT_START.test(tail)) {
+    return null;
+  }
+  return { head, tail };
+}
+
+function evalSource(code, form) {
+  let body = code;
+  if (form === "expression") {
+    body = `return (${code}\n);`;
+  } else if (form === "last") {
+    const parts = splitLastStatement(code);
+    body = `${parts.head}\nreturn (${parts.tail}\n);`;
+  }
   return `(async function () {
     const page = window.wrappedJSObject;
     const __value = await (async () => { ${body}\n })();
     return (${SERIALIZE})(__value);
-  })().then(v => ({ ok: true, value: v }), e => ({ ok: false, error: String((e && e.stack) || e) }));`;
+  })().then(v => ({ ok: true, value: v }), e => ({ ok: false, error: e && e.stack ? \`\${e}\\n\${e.stack}\` : String(e) }));`;
 }
 
 async function evalPageCommand(p) {
   const effects = [];
   await readyTab(p.tab, effects);
   const frameId = p.frame || 0;
-  const run = async asExpression => {
+  const run = async form => {
     const [result] = await browser.tabs.executeScript(p.tab, {
-      code: evalSource(p.code, asExpression),
+      code: evalSource(p.code, form),
       frameId,
       runAt: "document_idle",
     });
@@ -417,22 +574,31 @@ async function evalPageCommand(p) {
         throw new CommandError("timeout", `The code didn't finish within ${timeout / 1000} s.`);
       }),
     ]);
-  try {
-    result = await withTimeout(run(true));
-  } catch (e) {
-    if (e instanceof CommandError) {
-      throw e;
-    }
-    // Runtime errors come back as { ok: false }; a thrown error means the code didn't compile
-    // as an expression, so try it as statements.
+  // Runtime errors come back as { ok: false }; a thrown error means the code didn't compile in
+  // that form, so nothing ran and the next form can be tried: an expression, statements whose
+  // last one is returned, then plain statements.
+  const forms = ["expression", ...(splitLastStatement(p.code) ? ["last"] : []), "statements"];
+  let compileError = null;
+  for (const form of forms) {
     try {
-      result = await withTimeout(run(false));
-    } catch (e2) {
-      if (e2 instanceof CommandError) {
-        throw e2;
+      result = await withTimeout(run(form));
+      compileError = null;
+      break;
+    } catch (e) {
+      if (e instanceof CommandError) {
+        throw e;
       }
-      throw new CommandError("eval_failed", e2.message);
+      compileError = e;
     }
+  }
+  if (compileError) {
+    if (/host permission|can't access|cannot access|not allowed to access/i.test(compileError.message)) {
+      throw new CommandError(
+        "unreachable_page",
+        `Agent F can't run code in this page (${compileError.message}). Extensions are kept out of privileged pages and of Mozilla's restricted sites.`
+      );
+    }
+    throw new CommandError("eval_failed", compileError.message);
   }
   if (!result || !result.ok) {
     throw new CommandError("script_error", result ? result.error : "No result.");

@@ -16,7 +16,8 @@ ERROR_CODE_RE = re.compile(r"Error \(([a-z_]+)\)")
 PLAIN_ARGS = {"browser", "tab", "tabs", "window", "ref", "selector", "role", "mode", "action", "direction",
               "button", "count", "full_page", "marks", "format", "network", "console", "bodies", "level",
               "label", "group", "container", "background", "private", "wait", "method", "state", "limit",
-              "to_ref", "to_selector", "session_id", "gone", "load", "network_idle", "once", "confirm"}
+              "to_ref", "to_selector", "session_id", "gone", "load", "network_idle", "once", "confirm",
+              "type", "headers", "trusted", "names"}
 URL_ARGS = {"url"}
 
 

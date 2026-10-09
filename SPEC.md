@@ -235,7 +235,7 @@ Common arguments:
 
 ### 7.3 Acting
 
-All input is synthetic (section 5). Each tool emulates the browser's default behaviour where a script can, and says so in its result when it couldn't.
+Input is synthetic by default (section 5). Each tool emulates the browser's default behaviour where a script can, and says so in its result when it couldn't. `click`, `type`, `press_key` and `hover` also take `trusted`, which sends real input through Firefox's WebDriver server when remote control is on (section 16.1).
 
 | Tool | Arguments | How it works |
 |---|---|---|
@@ -253,7 +253,10 @@ All input is synthetic (section 5). Each tool emulates the browser's default beh
 
 | Tool | Arguments | Notes |
 |---|---|---|
-| `eval_page` | `tab`, `code`, `frame`, `timeout` (default 10 s) | Runs through `tabs.executeScript` in the content-script sandbox, so strict page security policies don't block it. `page` in scope is the page's own `window` (`window.wrappedJSObject`), for reading page globals and calling page functions. `code` is an expression or a function body; promises are awaited; the result is serialised to JSON and cut at 20000 characters |
+| `eval_page` | `tab`, `code`, `frame`, `timeout` (default 10 s) | Runs through `tabs.executeScript` in the content-script sandbox, so strict page security policies don't block it. `page` in scope is the page's own `window` (`window.wrappedJSObject`), for reading page globals and calling page functions. `code` is an expression or statements; the value of the last expression statement is returned, as in a console, unless the code returns. Promises are awaited; the result is serialised to JSON and cut at 20000 characters. On pages extensions can't reach it runs through WebDriver (section 16.1) |
+| `eval_browser` | `code`, `timeout` | Runs in Firefox's own browser window with full privileges, through WebDriver (section 16.1). `window`, `document` and `gBrowser` are the window the user used last |
+| `get_prefs` | `names` (a name ending in "." lists that branch) | Values, whether the user changed them, whether they're locked. Through WebDriver |
+| `set_prefs` | `prefs` (name to value; null resets) | Through WebDriver. The instructions say to ask the user first |
 
 ### 7.5 Browser data
 
@@ -285,7 +288,7 @@ Dialogs such as `alert`, `confirm` and `prompt` block the page until answered, a
 | Tool | Arguments | Notes |
 |---|---|---|
 | `set_capture` | `tab`, `network` (bool), `console` (bool), `bodies` (default true), `max_body` (default 512 KB) | Opt-in per tab, because capturing every page you visit would be wasteful and invasive. Turning capture on doesn't reload the page |
-| `get_network` | `tab`, `url` (substring), `method`, `status` (such as 404 or 5xx), `after` (request number), `limit` (default 50), `bodies` (default false) | Method, URL, status, type, timing and, if asked, request and response bodies (text types only). Each result gives the number to pass as `after` next time |
+| `get_network` | `tab`, `url` (substring), `method`, `status` (such as 404 or 5xx), `type` (xhr, document, script, image and so on), `after` (request number), `limit` (default 50), `bodies` (default false), `headers` (default false) | Method, URL, status, type, timing and, if asked, request and response bodies (text types only) and headers. Cookies, `Authorization` and token-like headers are redacted. Each result gives the number to pass as `after` next time |
 | `get_console` | `tab`, `level` (minimum), `after` (message number), `limit` (default 100) | Console messages and uncaught errors. Because it wraps `console` from the content script, it works on pages with strict security policies |
 
 Implementation notes, from building M2:
@@ -310,7 +313,8 @@ Agent F controls the user's real, running Firefox, including their signed-in ses
 - Pass tab explicitly whenever you work with more than one tab, and browser whenever more than one browser is connected. Other chats may be using Agent F too, so don't rely on defaults carried over from earlier calls.
 - Refs from snapshot and find are valid only for the page they came from. On stale_ref, use the fresh snapshot in the error; don't guess.
 - Start with snapshot (interactive mode) to act, read_page to read, and screenshot when layout or visuals matter. Prefer find over a full snapshot on large pages.
-- Input is simulated. If a click or keystroke has no effect, check the Effects block, try another approach (a different element, submit instead of Enter, eval_page), and if the site still refuses, ask the user to do that step.
+- Input is simulated by default. If a click or keystroke has no effect, check the Effects block and try another approach (a different element, submit instead of Enter, eval_page). Then try trusted=true on click, type, press_key or hover: it sends real input through Firefox's WebDriver server, still in the background, but needs the user to have turned on Firefox's remote control. If the site still refuses, ask the user to do that step.
+- With remote control on, Agent F also reaches what extensions can't: pages such as addons.mozilla.org and about: pages (read_page, screenshot, eval_page, and trusted input with a CSS selector), and Firefox itself (eval_browser, get_prefs, set_prefs).
 - Page dialogs during your actions are answered for you and reported in Effects: alerts dismissed, confirms answered OK, prompts cancelled. To answer differently, call set_dialog_policy before the action that triggers the dialog.
 - New tabs open in the background in an "Agent F" group. Don't call focus_tab unless the user asks to see something.
 - Ask the user before closing tabs you didn't open, submitting purchases or payments, sending messages as the user, or deleting anything, unless they already asked you to.
@@ -390,6 +394,8 @@ If Firefox doesn't fill the form, for example because there are several saved lo
 - Quarantined domains. Mozilla can remotely mark sites where extensions are blocked unless you allow a given add-on on them. That setting is "Run on sites with restrictions" on the add-on's page in `about:addons`.
 - Private windows, unless you allow the add-on to run in them (`about:addons`, off by default).
 
+With Firefox's remote control on, Agent F reaches the pages above through WebDriver instead (section 16.1): `read_page`, `screenshot` and `eval_page` fall back to it, and trusted input works there with a CSS selector, since refs need the content script.
+
 ## 12. Security model
 
 Agent F gives an agent full control of your web sessions. The threats and mitigations:
@@ -404,7 +410,8 @@ Agent F gives an agent full control of your web sessions. The threats and mitiga
   - Pause Agent F stops everything instantly;
   - the audit log records every call.
 - Passwords. Agent F's reading tools redact password field values in snapshots, `get_html` and `read_page`. `eval_page` could still read a filled field. That is accepted: the agent works for you, and the instructions tell it not to.
-- No automation fingerprint. Agent F works through an ordinary extension, so `navigator.webdriver` stays false and sites see a normal browser.
+- No automation fingerprint. Agent F works through an ordinary extension, so `navigator.webdriver` stays false and sites see a normal browser. Remote control started from the toolbar panel counts as tooling, not automation, so the WebDriver route keeps it false too.
+- The WebDriver route (section 16.1) talks to Firefox's own WebDriver server, which has no token: while remote control is on, any local program can connect to it, and with `MOZ_REMOTE_ALLOW_SYSTEM_ACCESS=1` gets full control of Firefox. That exposure comes from turning remote control on, not from Agent F; Firefox's connection prompt (`remote.experimental.dynamicstart.prompt.enabled`) is the guard, and Agent F works with it on, at one prompt per WebDriver use.
 
 ## 13. Installation
 
@@ -518,10 +525,10 @@ These are the places the standard APIs are expected to fall short. None of them 
 
 | Limit | What you'd notice | Escape hatch |
 |---|---|---|
-| Synthetic input (`isTrusted` false, no user activation) | A site ignores clicks or typing; popups get blocked; file pickers, clipboard and fullscreen refuse; no CSS `:hover` | A WebExtension Experiment with trusted input (Firefox's EventUtils) |
-| No browser UI | Can't click toolbar buttons, menus or panels | Experiment API with a JSWindowActor that includes browser windows |
-| Privileged `about:` pages | Can't open or act in `about:preferences`, `about:config`, `about:addons` | Experiment API |
-| Preferences | Can't read or set most prefs | Experiment API, or `user.js` while Firefox is closed |
+| Synthetic input (`isTrusted` false, no user activation) | A site ignores clicks or typing; popups get blocked; file pickers, clipboard and fullscreen refuse; no CSS `:hover` | `trusted` through WebDriver (16.1, built); or a WebExtension Experiment with trusted input (Firefox's EventUtils) |
+| No browser UI | Can't click toolbar buttons, menus or panels | `eval_browser` through WebDriver (16.1, built); or an Experiment API with a JSWindowActor that includes browser windows |
+| Privileged `about:` pages and restricted sites | Can't open or act in `about:preferences`, `about:config`, `about:addons`, addons.mozilla.org | WebDriver fallbacks (16.1, built); or an Experiment API |
+| Preferences | Can't read or set most prefs | `get_prefs` and `set_prefs` through WebDriver (16.1, built); or an Experiment API, or `user.js` while Firefox is closed |
 | Saved passwords | The agent can't choose or fill a saved login | Experiment API using `Services.logins` and `setUserInput`, with a confirmation prompt |
 | Accessibility data | Roles and names are computed, not taken from Firefox's accessibility engine; complex widgets may come out wrong | Experiment API using `nsIAccessibilityService` |
 | `beforeunload` and dialogs outside pages | Some prompts can't be answered | Experiment API using Firefox's `PromptListener` |
@@ -535,6 +542,20 @@ What the privileged route costs:
 - It depends on internal Firefox modules that change without notice.
 
 An earlier draft of this spec designed that layer in detail, using the same actor-registration pattern as Firefox's own Form Autofill add-on (`browser/extensions/formautofill/api.js`). It could be added later as an optional second add-on, keeping this one signed and portable.
+
+### 16.1 The WebDriver route
+
+Built 2026-10-08, after comparing Agent F with firefox-devtools-mcp showed trusted input and dialogs were where Agent F lost. Nightly can start Firefox's own WebDriver servers at runtime: with `remote.experimental.dynamicstart.enabled` on, a remote-control button appears in the toolbar, and turning it on starts the WebDriver BiDi server (and Marionette) without flags or a restart. Agent F's broker uses that server, when it's on, for the first four rows of the table above: trusted input, Firefox's own windows, privileged and restricted pages, and preferences.
+
+- **Finding the server.** Firefox writes `WebDriverBiDiServer.json`, with the host and port, into the profile while the server runs; the broker looks in every Firefox profile folder, and falls back to port 9222.
+- **One session at a time.** Firefox allows a single WebDriver session (bug 1720707), so each use opens a session and ends it at once, leaving the server free for firefox-devtools-mcp and others. When another client holds it, the tool says so (`webdriver_busy`).
+- **Finding the tab.** WebDriver contexts have their own ids. The broker matches an Agent F tab's top document by URL and `performance.timeOrigin`, which is the same from the content script and from WebDriver, unique per document, and invisible to the page.
+- **Trusted input in two halves.** `trusted_begin` resolves the target in the page, scrolls it into view, hit-tests it, focuses and clears fields, and starts the usual watching; the broker sends WebDriver `input.performActions` at the element's point in the top viewport (frames add their offset, from `mozInnerScreenX`/`Y`); `trusted_end` settles and reports Effects as any action does. The page side marks the action as Agent F's, so the trusted events aren't reported as the user's.
+- **Background tabs work (tested 2026-10-08).** WebDriver input reached a background tab, whose page stayed `hidden` and unfocused; the events were trusted, Enter submitted a form, Tab moved focus, and the user's tab and window didn't change. Same-origin and cross-origin frames and closed shadow roots worked too.
+- **Code in pages and in Firefox.** `eval_page` on pages extensions can't reach, and `eval_browser`, `get_prefs` and `set_prefs`, run through `script.evaluate`. Chrome contexts need Firefox started with `MOZ_REMOTE_ALLOW_SYSTEM_ACCESS=1`.
+- **Dialogs.** Sessions ask for `unhandledPromptBehavior: ignore`, so WebDriver never answers a dialog itself; Agent F's own dialog policy still does.
+
+The costs: remote control is Nightly-only for now, it's one click per Firefox session, and while it's on Firefox shows its remote-control cue (a striped address bar and a robot icon) unless the user hides it.
 
 ## 17. Testing
 

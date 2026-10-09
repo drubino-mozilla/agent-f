@@ -30,6 +30,9 @@ var AgentF = typeof AgentF !== "undefined" ? AgentF : {};
       drag: A.drag,
       set_dialog_policy: A.setDialogPolicy,
       enable_console: A.enableConsole,
+      trusted_prepare: A.trustedPrepare,
+      trusted_result: A.trustedResult,
+      viewport_origin: A.viewportOrigin,
     };
 
     if (!A.listening) {

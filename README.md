@@ -18,10 +18,17 @@ The design and its reasoning are in [SPEC.md](SPEC.md).
 - Tabs and windows: list, open, close, focus and unload tabs. It keeps its own tabs in an "Agent F" tab group and works across several Firefox profiles at once.
 - Reading: accessibility-style snapshots with element refs, `find`, pages as Markdown, `find_in_page`, screenshots (with numbered marks) and raw HTML.
 - Acting: click, type, press keys, hover, choose options, scroll, drag, upload files and run scripts, all in background tabs and minimized windows.
-- Page events: answer alerts and confirms by policy, and capture network requests and console messages.
+- Page events: answer alerts and confirms by policy, and capture network requests (with headers) and console messages.
 - Browser data: search history and bookmarks, add bookmarks, list downloads, and reopen recently closed tabs.
 
 Every result starts with what changed since the agent's previous call: tabs you opened or closed, pages that navigated, a tab you switched to.
+
+With Firefox's remote control turned on, Agent F can do more through Firefox's own WebDriver server, still in the background:
+- send real, trusted clicks and keystrokes, for sites that ignore simulated input;
+- read and act in pages extensions are kept out of, such as addons.mozilla.org and `about:` pages;
+- run code in Firefox's own window and read or change preferences.
+
+Remote control is in Firefox Nightly: set `remote.experimental.dynamicstart.enabled` to true in `about:config`, then use the remote-control button in the toolbar to turn it on, once per Firefox session. Running code in Firefox's own window also needs Firefox started with the environment variable `MOZ_REMOTE_ALLOW_SYSTEM_ACCESS=1`. Firefox allows one WebDriver client at a time, so these features wait while another one, such as firefox-devtools-mcp, is connected. See [SPEC.md](SPEC.md) section 16.1.
 
 ## Install
 
@@ -64,7 +71,7 @@ A clone install and a packaged one share the data folder; whichever ran last is 
 
 - Agent F has full control of your web sessions, so treat it like any tool with your passwords' reach. Everything binds to `127.0.0.1` and needs a secret token, and web pages can't reach the broker. Every call is recorded in `logs/audit.log` in the data folder.
 - The toolbar button shows what agents are doing, and its Pause switch stops them at once.
-- Firefox keeps extensions out of `about:` pages and a few Mozilla sites (addons.mozilla.org, the Mozilla accounts sites, support.mozilla.org). Clearing `extensions.webextensions.restrictedDomains` in `about:config` opens most of those, but never addons.mozilla.org.
+- Firefox keeps extensions out of `about:` pages and a few Mozilla sites (addons.mozilla.org, the Mozilla accounts sites, support.mozilla.org). Clearing `extensions.webextensions.restrictedDomains` in `about:config` opens most of those, but never addons.mozilla.org. With remote control on, Agent F reaches all of them through WebDriver.
 - In private windows it runs only if you allow it in `about:addons`.
 - The data folder is `%LOCALAPPDATA%\agent-f` on Windows, `~/Library/Application Support/agent-f` on macOS, and `~/.local/share/agent-f` on Linux. Logs are in its `logs` folder.
 - To remove a clone install, run `install/install.py --uninstall` (add `--purge` to delete the data folder), then remove the add-on in `about:addons`.

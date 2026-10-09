@@ -673,6 +673,66 @@ var AgentF = typeof AgentF !== "undefined" ? AgentF : {};
       };
     };
 
+    // Trusted input: the broker sends real input through Firefox's WebDriver BiDi server. The page side
+    // finds where it should go, gets the element ready, and later reports the result. The input itself
+    // is trusted, so it isn't reported as the user's until trustedResult.
+    A.trustedPrepare = async function (params) {
+      A.actingUntil = performance.now() + 20000;
+      A.markAgentActive(20000);
+      let el;
+      let point = null;
+      if (params.action === "click" || params.action === "hover") {
+        el = A.resolveTarget(params);
+        point = pointFor(el, params);
+        hitTarget(el, point.x, point.y);
+      } else if (params.action === "type") {
+        el = editableTarget(A.resolveTarget(params));
+        ensureInView(el);
+        el.focus({ preventScroll: true });
+        if (params.clear !== false) {
+          selectAllIn(el);
+          if (!params.text) {
+            deleteSelection(el);
+          }
+        } else {
+          caretToEnd(el);
+        }
+      } else {
+        el = params.node != null || params.selector ? A.resolveTarget(params) : A.deepActiveElement();
+        if (!el || el === document.documentElement) {
+          el = document.body;
+        }
+        if ((params.node != null || params.selector) && typeof el.focus === "function") {
+          el.focus({ preventScroll: true });
+        }
+      }
+      A.trustedTarget = el;
+      startWatch(el);
+      return { ...A.viewportOrigin(), x: point && point.x, y: point && point.y, target: A.describe(el) };
+    };
+
+    A.trustedResult = async function () {
+      const el = A.trustedTarget;
+      A.trustedTarget = null;
+      A.actingUntil = performance.now() + 600;
+      if (!el || !el.isConnected || !(isTextField(el) || el.isContentEditable)) {
+        return {};
+      }
+      const hidden = isHiddenInput(el);
+      if (isTextField(el)) {
+        fire(el, "change");
+      }
+      return { value: hidden ? null : A.valueOf(el), hiddenInput: hidden };
+    };
+
+    // Where this frame's viewport sits on screen, and what identifies its document to WebDriver.
+    A.viewportOrigin = () => ({
+      screenX: window.mozInnerScreenX,
+      screenY: window.mozInnerScreenY,
+      url: location.href,
+      timeOrigin: performance.timeOrigin,
+    });
+
     // Firefox records who put each item in a DataTransfer and hides items added by the extension
     // from the page, so drag data and dropped files are built with the page's own constructors.
     function pageDataTransfer(files = []) {
@@ -811,8 +871,11 @@ var AgentF = typeof AgentF !== "undefined" ? AgentF : {};
         o => values.includes(o.value) || labels.includes(o.text.trim().toLowerCase())
       );
       if (!matches.length) {
-        const available = Array.from(el.options).slice(0, 20).map(o => A.quote(A.clean(o.text, 40))).join(", ");
-        throw new AgentError("no_such_option", `No matching option. Options: ${available}`);
+        const asked = [...(params.values || []).map(v => `value ${A.quote(v)}`),
+          ...(params.labels || []).map(l => `label ${A.quote(l)}`)].join(", ");
+        const available = Array.from(el.options).slice(0, 20)
+          .map(o => `${A.quote(A.clean(o.text, 40))} (value ${A.quote(o.value)})`).join(", ");
+        throw new AgentError("no_such_option", `No option matches ${asked}. Options: ${available}`);
       }
       startWatch(el);
       el.focus({ preventScroll: true });
