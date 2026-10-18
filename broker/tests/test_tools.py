@@ -198,3 +198,24 @@ async def test_open_tab_becomes_current_and_screenshot_returns_an_image():
     finally:
         await ext.close()
         await ctx.__aexit__(None, None, None)
+
+
+async def test_list_containers():
+    containers = [{"name": "Work", "color": "blue", "icon": "briefcase", "tabs": 2},
+                  {"name": "Shopping", "color": "pink", "icon": "cart", "tabs": 0}]
+    ctx, hub, mcp_port, ext = await start({"list_containers": lambda p: {"containers": containers}})
+    try:
+        async with mcp_client(mcp_port) as client:
+            text, is_error = await call(client, "list_containers")
+            assert not is_error, text
+            assert text.startswith("[nightly-a]")
+            assert "2 containers." in text
+            assert '- "Work" (blue, briefcase): 2 open tabs' in text
+            assert '- "Shopping" (pink, cart): 0 open tabs' in text
+
+            containers.clear()
+            text, _ = await call(client, "list_containers")
+            assert "This Firefox has no containers." in text
+    finally:
+        await ext.close()
+        await ctx.__aexit__(None, None, None)

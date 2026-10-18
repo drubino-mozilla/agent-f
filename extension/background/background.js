@@ -186,6 +186,27 @@ async function listTabs({ window: windowId, query }) {
   };
 }
 
+async function listContainers() {
+  let identities;
+  try {
+    identities = await browser.contextualIdentities.query({});
+  } catch (e) {
+    throw new CommandError("containers_unavailable", `Containers aren't available in this Firefox: ${e.message}`);
+  }
+  const counts = new Map();
+  for (const tab of await browser.tabs.query({})) {
+    counts.set(tab.cookieStoreId, (counts.get(tab.cookieStoreId) || 0) + 1);
+  }
+  return {
+    containers: identities.map(c => ({
+      name: c.name,
+      color: c.color,
+      icon: c.icon,
+      tabs: counts.get(c.cookieStoreId) || 0,
+    })),
+  };
+}
+
 async function setLabel({ label }) {
   if (typeof label !== "string" || !label) {
     throw new CommandError("bad_label", "A label is required.");
@@ -209,6 +230,7 @@ const COMMANDS = {
   ping: async () => ({ pong: true }),
   reload_extension: reloadExtension,
   list_tabs: listTabs,
+  list_containers: listContainers,
   set_label: setLabel,
   resolve_tab: resolveTab,
   open_tab: openTabCommand,

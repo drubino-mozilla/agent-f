@@ -33,6 +33,7 @@ const COMMAND_NAMES = {
   get_network: "Read network requests",
   get_console: "Read the console",
   list_tabs: "Listed tabs",
+  list_containers: "Listed containers",
   set_label: "Renamed this browser",
   search_history: "Searched history",
   search_bookmarks: "Searched bookmarks",

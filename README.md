@@ -15,7 +15,7 @@ The design and its reasoning are in [SPEC.md](SPEC.md).
 
 ## What an agent can do with it
 
-- Tabs and windows: list, open, close, focus and unload tabs. It keeps its own tabs in an "Agent F" tab group and works across several Firefox profiles at once.
+- Tabs and windows: list, open, close, focus and unload tabs, and list containers to open tabs in. It keeps its own tabs in an "Agent F" tab group and works across several Firefox profiles at once.
 - Reading: accessibility-style snapshots with element refs, `find`, pages as Markdown, `find_in_page`, screenshots (with numbered marks) and raw HTML.
 - Acting: click, type, press keys, hover, choose options, scroll, drag, upload files and run scripts, all in background tabs and minimized windows.
 - Page events: answer alerts and confirms by policy, and capture network requests (with headers) and console messages.

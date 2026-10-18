@@ -127,6 +127,25 @@ def register(mcp: FastMCP, kit: Toolkit, audit: Audit | None = None) -> None:
         return kit.finish(session, _render_tab_list(result, session, conn), header=envelope.browser_header(conn.label))
 
     @tool()
+    async def list_containers(ctx: Context, browser: str | None = None, since: str | None = None) -> str:
+        """List the Firefox containers set up in this browser, with how many tabs are open in each.
+
+        Args:
+            browser: Browser label. Needed only when several browsers are connected.
+            since: The since token from the end of your previous Agent F result.
+        """
+        def render(result, conn):
+            containers = result.get("containers", [])
+            if not containers:
+                return "This Firefox has no containers.", None
+            lines = [f"{_plural(len(containers), 'container')}. Pass a name as container to open_tab."]
+            for c in containers:
+                lines.append(f"- {quote(c.get('name'))} ({c.get('color')}, {c.get('icon')}): "
+                             f"{_plural(c.get('tabs', 0), 'open tab')}")
+            return "\n".join(lines), None
+        return await kit.run_browser(ctx, since, browser=browser, command="list_containers", render=render, params={})
+
+    @tool()
     async def open_tab(ctx: Context, url: str | None = None, browser: str | None = None, window: int | None = None,
                        group: str = "Agent F", container: str | None = None, background: bool = True,
                        since: str | None = None) -> str:
@@ -137,7 +156,7 @@ def register(mcp: FastMCP, kit: Toolkit, audit: Audit | None = None) -> None:
             browser: Browser label. Needed only when several browsers are connected.
             window: Window id. Defaults to the window the user used last.
             group: Tab group to put it in. Pass an empty string for none.
-            container: Name of a Firefox container (such as Work) to open it in.
+            container: Name of a Firefox container (such as Work) to open it in. list_containers names them.
             background: Open without switching to it. Keep this true unless the user wants to see the tab.
             since: The since token from the end of your previous Agent F result.
         """

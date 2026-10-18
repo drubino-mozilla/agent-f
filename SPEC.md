@@ -214,6 +214,7 @@ Common arguments:
 | `list_browsers` | none | Label, Firefox name and version, paused or not, connected since |
 | `label_browser` | `browser`, `label` | Renames a browser; stored in the extension |
 | `list_tabs` | `browser`, `window`, `query` (title or URL substring) | Grouped by window. Shows the focused window, each window's active tab, tab group, container, pinned, discarded, private (only if allowed), and this session's current tab |
+| `list_containers` | `browser` | Each container's name, colour, icon and number of open tabs. The names are what `open_tab` takes |
 | `open_tab` | `url`, `browser`, `window` (default: last-focused), `group` (default "Agent F"; null for none), `container` (name), `background` (default true) | Becomes the current tab. Sets `autoDiscardable` to false |
 | `close_tab` | `tab` or `tabs` | Any tab. The server instructions ask the agent to check with you before closing tabs it didn't open |
 | `open_window` | `url`, `browser`, `private` | Takes focus; Firefox offers no way to avoid that |
