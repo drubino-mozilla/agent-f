@@ -1,7 +1,7 @@
 {
   "manifest_version": 2,
   "name": "Agent F",
-  "version": "0.5.1",
+  "version": "0.5.2",
   "homepage_url": "https://github.com/drubino-mozilla/agent-f",
   "developer": {
     "name": "David Rubino",
@@ -29,6 +29,7 @@
     "tabs",
     "tabGroups",
     "contextualIdentities",
+    "cookies",
     "nativeMessaging",
     "storage",
     "webNavigation",
