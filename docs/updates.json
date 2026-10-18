@@ -41,6 +41,16 @@
               "strict_min_version": "140.0"
             }
           }
+        },
+        {
+          "version": "0.5.1",
+          "update_link": "https://github.com/drubino-mozilla/agent-f/releases/download/v0.5.1/agent-f-0.5.1.xpi",
+          "update_hash": "sha256:7cfe39505886e93840bf87144e820f0af69d00eda25feb61102fef77854b0e13",
+          "applications": {
+            "gecko": {
+              "strict_min_version": "140.0"
+            }
+          }
         }
       ]
     }
